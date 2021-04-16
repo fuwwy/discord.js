@@ -15,11 +15,12 @@ module.exports = (client, { d: data }, shard) => {
   for (const guild of data.guilds) {
     guild.shardID = shard.id;
     client.guilds.add(guild);
+    shard.expectedGuilds.delete(guild.id);
   }
 
   if (client.application) {
     client.application._patch(data.application);
-  } else {
+  } else if (data.application) {
     client.application = new ClientApplication(client, data.application);
   }
 

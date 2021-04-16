@@ -3454,15 +3454,19 @@ declare module 'discord.js' {
   type WebhookTypes = 'Incoming' | 'Channel Follower';
 
   interface WebSocketOptions {
-    large_threshold?: number;
-    compress?: boolean;
     properties?: WebSocketProperties;
   }
 
   interface WebSocketProperties {
-    $os?: string;
-    $browser?: string;
-    $device?: string;
+    browser?: string;
+    client_build_number?: number;
+    client_event_source?: null;
+    client_version?: string;
+    os?: string;
+    os_arch?: string;
+    os_version?: string;
+    release_channel?: string;
+    system_locale?: string;
   }
 
   type WSEventType =

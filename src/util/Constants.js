@@ -58,16 +58,18 @@ exports.DefaultOptions = {
   /**
    * WebSocket options (these are left as snake_case to match the API)
    * @typedef {Object} WebsocketOptions
-   * @property {number} [large_threshold=50] Number of members in a guild after which offline users will no longer be
-   * sent in the initial guild member list, must be between 50 and 250
    */
   ws: {
-    large_threshold: 50,
-    compress: false,
     properties: {
-      $os: process.platform,
-      $browser: 'discord.js',
-      $device: 'discord.js',
+      browser: 'Discord Client',
+      client_build_number: 82471,
+      client_event_source: null,
+      client_version: '1.0.28',
+      os: 'Windows',
+      os_arch: 'x64',
+      os_version: '10.0.19042',
+      release_channel: 'canary',
+      system_locale: 'en-US',
     },
     version: 8,
   },
@@ -95,10 +97,6 @@ exports.UserAgent = `DiscordBot (${Package.homepage.split('#')[0]}, ${Package.ve
 exports.WSCodes = {
   1000: 'WS_CLOSE_REQUESTED',
   4004: 'TOKEN_INVALID',
-  4010: 'SHARDING_INVALID',
-  4011: 'SHARDING_REQUIRED',
-  4013: 'INVALID_INTENTS',
-  4014: 'DISALLOWED_INTENTS',
 };
 
 const AllowedImageFormats = ['webp', 'png', 'jpg', 'jpeg', 'gif'];

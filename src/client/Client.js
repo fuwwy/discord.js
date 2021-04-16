@@ -18,7 +18,6 @@ const Webhook = require('../structures/Webhook');
 const Collection = require('../util/Collection');
 const { Events, DefaultOptions, InviteScopes } = require('../util/Constants');
 const DataResolver = require('../util/DataResolver');
-const Intents = require('../util/Intents');
 const Permissions = require('../util/Permissions');
 const Structures = require('../util/Structures');
 
@@ -31,8 +30,7 @@ class Client extends BaseClient {
    * @param {ClientOptions} options Options for the client
    */
   constructor(options) {
-    super(Object.assign({ _tokenType: 'Bot' }, options));
-
+    super(options);
     // Obtain shard details from environment or if present, worker threads
     let data = process.env;
     try {
@@ -129,7 +127,7 @@ class Client extends BaseClient {
      * @private
      * @type {ClientPresence}
      */
-    this.presence = new ClientPresence(this, options.presence);
+    this.presence = new ClientPresence(this, this.options.presence);
 
     Object.defineProperty(this, 'token', { writable: true });
     if (!this.token && 'DISCORD_TOKEN' in process.env) {
@@ -450,11 +448,6 @@ class Client extends BaseClient {
    * @private
    */
   _validateOptions(options = this.options) {
-    if (typeof options.intents === 'undefined') {
-      throw new TypeError('CLIENT_MISSING_INTENTS');
-    } else {
-      options.intents = Intents.resolve(options.intents);
-    }
     if (typeof options.shardCount !== 'number' || isNaN(options.shardCount) || options.shardCount < 1) {
       throw new TypeError('CLIENT_INVALID_OPTION', 'shardCount', 'a number greater than or equal to 1');
     }
