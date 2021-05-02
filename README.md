@@ -13,7 +13,7 @@
     <a href="https://www.patreon.com/discordjs"><img src="https://img.shields.io/badge/donate-patreon-F96854.svg" alt="Patreon" /></a>
   </p>
   <p>
-    <a href="https://nodei.co/npm/discord.js/"><img src="https://nodei.co/npm/discord.js.png?downloads=true&stars=true" alt="npm installnfo" /></a>
+    <a href="https://nodei.co/npm/selfdiscord.js/"><img src="https://nodei.co/npm/selfdiscord.js.png?downloads=true&stars=true" alt="npm installnfo" /></a>
   </p>
 </div>
 
@@ -30,6 +30,8 @@
 - [Help](#help)
 
 ## About
+
+selfidscord.js is a fork of discord.js targeted for selfbots/user accounts.
 
 discord.js is a powerful [Node.js](https://nodejs.org) module that allows you to easily interact with the
 [Discord API](https://discord.com/developers/docs/intro).
@@ -68,7 +70,7 @@ For production bots, using @discordjs/opus should be considered a necessity, esp
 
 ```js
 const { Client, Intents } = require('discord.js');
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+const client = new Client();
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);

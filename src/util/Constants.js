@@ -71,6 +71,13 @@ exports.DefaultOptions = {
       release_channel: 'canary',
       system_locale: 'en-US',
     },
+    client_state: {
+      guild_hashes: {},
+      highest_last_message_id: '0',
+      read_state_version: 0,
+      user_guild_settings_version: -1,
+    },
+    capabilities: 61,
     version: 8,
   },
 

@@ -38,7 +38,10 @@ class BaseClient extends EventEmitter {
      * The options the client was instantiated with
      * @type {ClientOptions}
      */
+    let clone;
+    if (options.ws && options.ws.properties) clone = { ...options.ws.properties };
     this.options = Util.mergeDefault(DefaultOptions, options);
+    if (clone) this.options.ws.properties = clone;
 
     /**
      * The REST manager of the client
