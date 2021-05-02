@@ -1,6 +1,6 @@
 {
   "name": "selfdiscord.js",
-  "version": "0.1.1@12.5.0",
+  "version": "0.1.1-12.5.0",
   "description": "A powerful library for interacting with the Discord API",
   "main": "./src/index.js",
   "types": "./typings/index.d.ts",
