@@ -137,6 +137,35 @@ class GuildMemberManager extends BaseManager {
   }
 
   /**
+   * Subscribe to member updates in the guild
+   * @param {Object} channels A map of channel IDs and member ranges to subscribe to
+   * @param {Object} [options] Subscription options
+   * @param {boolean} [options.threads] Whether or not to subscribe to threads? (Unknown)
+   * @param {boolean} [options.activities] Whether or not to subscribe to activities? (Unknown)
+   * @param {boolean} [options.typing] Whether or not to subscribe to typing events? (Assumption)
+   * The discord client doesn't typically request ranges of over 100 members,
+   * it's recommended to mimick that behaviour.
+   * @example
+   * // Subscribe to the first 100 members of a channel
+   * guild.members.subscribe({931966103244462322: [[0, 99]]});
+   * @example
+   * // Subscribe to the first 500 members of a channel.
+   * guild.members.subscribe({931966103244462322: [[0, 99],[100, 199],[200, 299],[300, 399],[400, 499]]});
+   */
+  subscribe(channels, options = {}) {
+    this.guild.shard.send({
+      op: OPCodes.LAZY_GUILD_SUBSCRIBE,
+      d: {
+        guild_id: this.guild.id,
+        channels,
+        threads: options.threads,
+        activities: options.activities,
+        typing: options.typing,
+      },
+    });
+  }
+
+  /**
    * Search for members in the guild based on a query.
    * @param {Object} options Search options
    * @property {string} options.query Filter members whose username or nickname start with this query
