@@ -37,7 +37,7 @@ class APIRequest {
 
     if (this.options.auth !== false) headers.Authorization = this.rest.getAuth();
     if (this.options.reason) headers['X-Audit-Log-Reason'] = encodeURIComponent(this.options.reason);
-    headers['User-Agent'] = UserAgent;
+    headers['User-Agent'] = this.options.userAgent || UserAgent;
     if (this.options.headers) headers = Object.assign(headers, this.options.headers);
 
     let body;

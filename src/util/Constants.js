@@ -100,7 +100,7 @@ exports.DefaultOptions = {
       user_guild_settings_version: -1,
     },
     capabilities: 61,
-    version: 8,
+    version: 9,
   },
 
   /**
@@ -114,7 +114,7 @@ exports.DefaultOptions = {
    * @property {Object} [headers] Additional headers to send for all API requests
    */
   http: {
-    version: 8,
+    version: 9,
     api: 'https://discord.com/api',
     cdn: 'https://cdn.discordapp.com',
     invite: 'https://discord.gg',
