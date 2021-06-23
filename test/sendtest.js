@@ -5,9 +5,9 @@ const path = require('path');
 const util = require('util');
 const fetch = require('node-fetch');
 const { owner, token } = require('./auth.js');
-const { Client, Intents, MessageAttachment, MessageEmbed } = require('../src');
+const { Client, MessageAttachment, MessageEmbed } = require('../src');
 
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+const client = new Client();
 
 const buffer = l => fetch(l).then(res => res.buffer());
 const read = util.promisify(fs.readFile);
@@ -109,6 +109,15 @@ client.on('message', async message => {
   }
 });
 
+client.on('ready', async message => {
+  console.log(message);
+});
+
+client.on('debug', async message => {
+  console.log(message);
+});
+
+console.log('Logging in with ' + token);
 client.login(token);
 
 // eslint-disable-next-line no-console
