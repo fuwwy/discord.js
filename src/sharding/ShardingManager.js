@@ -19,23 +19,28 @@ const Util = require('../util/Util');
  */
 class ShardingManager extends EventEmitter {
   /**
-   * The mode to spawn shards with for a {@link ShardingManager}: either "process" to use child processes, or
+   * The mode to spawn shards with for a {@link ShardingManager}. Either "process" to use child processes, or
    * "worker" to use [Worker threads](https://nodejs.org/api/worker_threads.html).
-   * @typedef {Object} ShardingManagerMode
+   * @typedef {string} ShardingManagerMode
+   */
+
+  /**
+   * The options to spawn shards with for a {@link ShardingManager}.
+   * @typedef {Object} ShardingManagerOptions
+   * @property {string|number} [totalShards='auto'] Number of total shards of all shard managers or "auto"
+   * @property {string|number[]} [shardList='auto'] List of shards to spawn or "auto"
+   * @property {ShardingManagerMode} [mode='process'] Which mode to use for shards
+   * @property {boolean} [respawn=true] Whether shards should automatically respawn upon exiting
+   * @property {string[]} [shardArgs=[]] Arguments to pass to the shard script when spawning
+   * (only available when mode is set to 'process')
+   * @property {string} [execArgv=[]] Arguments to pass to the shard script executable when spawning
+   * (only available when mode is set to 'process')
+   * @property {string} [token] Token to use for automatic shard count and passing to shards
    */
 
   /**
    * @param {string} file Path to your shard script file
-   * @param {Object} [options] Options for the sharding manager
-   * @param {string|number} [options.totalShards='auto'] Number of total shards of all shard managers or "auto"
-   * @param {string|number[]} [options.shardList='auto'] List of shards to spawn or "auto"
-   * @param {ShardingManagerMode} [options.mode='process'] Which mode to use for shards
-   * @param {boolean} [options.respawn=true] Whether shards should automatically respawn upon exiting
-   * @param {string[]} [options.shardArgs=[]] Arguments to pass to the shard script when spawning
-   * (only available when using the `process` mode)
-   * @param {string[]} [options.execArgv=[]] Arguments to pass to the shard script executable when spawning
-   * (only available when using the `process` mode)
-   * @param {string} [options.token] Token to use for automatic shard count and passing to shards
+   * @param {ShardingManagerOptions} [options] Options for the sharding manager
    */
   constructor(file, options = {}) {
     super();
@@ -160,11 +165,16 @@ class ShardingManager extends EventEmitter {
   }
 
   /**
+   * Option used to spawn multiple shards.
+   * @typedef {Object} MultipleShardSpawnOptions
+   * @property {number|string} [amount=this.totalShards] Number of shards to spawn
+   * @property {number} [delay=5500] How long to wait in between spawning each shard (in milliseconds)
+   * @property {number} [timeout=30000] The amount in milliseconds to wait until the {@link Client} has become ready
+   */
+
+  /**
    * Spawns multiple shards.
-   * @param {Object} [options] Options for spawning shards
-   * @param {number|string} [options.amount=this.totalShards] Number of shards to spawn
-   * @param {number} [options.delay=5500] How long to wait in between spawning each shard (in milliseconds)
-   * @param {number} [options.timeout=30000] The amount in milliseconds to wait until the {@link Client} has become
+   * @param {MultipleShardSpawnOptions} [options] Options for spawning shards
    * @returns {Promise<Collection<number, Shard>>}
    */
   async spawn({ amount = this.totalShards, delay = 5500, timeout = 30000 } = {}) {
@@ -222,13 +232,21 @@ class ShardingManager extends EventEmitter {
   }
 
   /**
+   * Options for {@link ShardingManager#broadcastEval} and {@link ShardClientUtil#broadcastEval}.
+   * @typedef {Object} BroadcastEvalOptions
+   * @property {number} [shard] Shard to run script on, all if undefined
+   * @property {*} [context] The JSON-serializable values to call the script with
+   */
+
+  /**
    * Evaluates a script on all shards, or a given shard, in the context of the {@link Client}s.
-   * @param {string} script JavaScript to run on each shard
-   * @param {number} [shard] Shard to run on, all if undefined
+   * @param {Function} script JavaScript to run on each shard
+   * @param {BroadcastEvalOptions} [options={}] The options for the broadcast
    * @returns {Promise<*>|Promise<Array<*>>} Results of the script execution
    */
-  broadcastEval(script, shard) {
-    return this._performOnShards('eval', [script], shard);
+  broadcastEval(script, options = {}) {
+    if (typeof script !== 'function') return Promise.reject(new TypeError('SHARDING_INVALID_EVAL_BROADCAST'));
+    return this._performOnShards('eval', [`(${script})(this, ${JSON.stringify(options.context)})`], options.shard);
   }
 
   /**
@@ -269,13 +287,18 @@ class ShardingManager extends EventEmitter {
   }
 
   /**
-   * Kills all running shards and respawns them.
-   * @param {Object} [options] Options for respawning shards
-   * @param {number} [options.shardDelay=5000] How long to wait between shards (in milliseconds)
-   * @param {number} [options.respawnDelay=500] How long to wait between killing a shard's process and restarting it
+   * Options used to respawn all shards.
+   * @typedef {Object} MultipleShardRespawnOptions
+   * @property {number} [shardDelay=5000] How long to wait between shards (in milliseconds)
+   * @property {number} [respawnDelay=500] How long to wait between killing a shard's process and restarting it
    * (in milliseconds)
-   * @param {number} [options.timeout=30000] The amount in milliseconds to wait for a shard to become ready before
-   * continuing to another. (-1 or Infinity for no wait)
+   * @property {number} [timeout=30000] The amount in milliseconds to wait for a shard to become ready before
+   * continuing to another (`-1` or `Infinity` for no wait)
+   */
+
+  /**
+   * Kills all running shards and respawns them.
+   * @param {MultipleShardRespawnOptions} [options] Options for respawning shards
    * @returns {Promise<Collection<string, Shard>>}
    */
   async respawnAll({ shardDelay = 5000, respawnDelay = 500, timeout = 30000 } = {}) {

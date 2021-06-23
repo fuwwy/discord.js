@@ -4,6 +4,24 @@ const Package = (exports.Package = require('../../package.json'));
 const { Error, RangeError } = require('../errors');
 
 /**
+ * Rate limit data
+ * @typedef {Object} RateLimitData
+ * @property {number} timeout Time until this rate limit ends, in ms
+ * @property {number} limit The maximum amount of requests of this endpoint
+ * @property {string} method The http method of this request
+ * @property {string} path The path of the request relative to the HTTP endpoint
+ * @property {string} route The route of the request relative to the HTTP endpoint
+ * @property {boolean} global Whether this is a global rate limit
+ */
+
+/**
+ * Whether this rate limit should throw an Error
+ * @typedef {Function} RateLimitQueueFilter
+ * @param {RateLimitData} rateLimitData The data of this rate limit
+ * @returns {boolean|Promise<boolean>}
+ */
+
+/**
  * Options for a client.
  * @typedef {Object} ClientOptions
  * @property {number|number[]|string} [shards] ID of the shard to run, or an array of shard IDs. If not specified,
@@ -34,6 +52,10 @@ const { Error, RangeError } = require('../errors');
  * (or 0 for never)
  * @property {number} [restGlobalRateLimit=0] How many requests to allow sending per second (0 for unlimited, 50 for
  * the standard global limit used by Discord)
+ * @property {string[]|RateLimitQueueFilter} [rejectOnRateLimit] Decides how rate limits and pre-emptive throttles
+ * should be handled. If this option is an array containing the prefix of the request route (e.g. /channels to match any
+ * route starting with /channels, such as /channels/222197033908436994/messages) or a function returning true, a
+ * {@link RateLimitError} will be thrown. Otherwise the request will be queued for later
  * @property {number} [retryLimit=1] How many times to retry on 5XX errors (Infinity for indefinite amount of retries)
  * @property {PresenceData} [presence={}] Presence data to use upon login
  * @property {IntentsResolvable} intents Intents to enable for this connection
@@ -89,6 +111,7 @@ exports.DefaultOptions = {
    * @property {string} [cdn='https://cdn.discordapp.com'] Base url of the CDN
    * @property {string} [invite='https://discord.gg'] Base url of invites
    * @property {string} [template='https://discord.new'] Base url of templates
+   * @property {Object} [headers] Additional headers to send for all API requests
    */
   http: {
     version: 8,
@@ -118,11 +141,16 @@ function makeImageUrl(root, { format = 'webp', size } = {}) {
 
 /**
  * Options for Image URLs.
- * @typedef {Object} ImageURLOptions
- * @property {string} [format] One of `webp`, `png`, `jpg`, `jpeg`, `gif`. If no format is provided,
- * defaults to `webp`.
+ * @typedef {StaticImageURLOptions} ImageURLOptions
  * @property {boolean} [dynamic] If true, the format will dynamically change to `gif` for
- * animated avatars; the default is false.
+ * animated avatars; the default is false
+ */
+
+/**
+ * Options for static Image URLs.
+ * @typedef {Object} StaticImageURLOptions
+ * @property {string} [format] One of `webp`, `png`, `jpg`, `jpeg`, `gif`. If no format is provided,
+ * defaults to `webp`
  * @property {number} [size] One of `16`, `32`, `64`, `128`, `256`, `512`, `1024`, `2048`, `4096`
  */
 
@@ -185,23 +213,6 @@ exports.Status = {
   RESUMING: 8,
 };
 
-/**
- * The current status of a voice connection. Here are the available statuses:
- * * CONNECTED: 0
- * * CONNECTING: 1
- * * AUTHENTICATING: 2
- * * RECONNECTING: 3
- * * DISCONNECTED: 4
- * @typedef {number} VoiceStatus
- */
-exports.VoiceStatus = {
-  CONNECTED: 0,
-  CONNECTING: 1,
-  AUTHENTICATING: 2,
-  RECONNECTING: 3,
-  DISCONNECTED: 4,
-};
-
 exports.OPCodes = {
   DISPATCH: 0,
   HEARTBEAT: 1,
@@ -218,32 +229,21 @@ exports.OPCodes = {
   LAZY_GUILD_SUBSCRIBE: 14,
 };
 
-exports.VoiceOPCodes = {
-  IDENTIFY: 0,
-  SELECT_PROTOCOL: 1,
-  READY: 2,
-  HEARTBEAT: 3,
-  SESSION_DESCRIPTION: 4,
-  SPEAKING: 5,
-  HELLO: 8,
-  CLIENT_CONNECT: 12,
-  CLIENT_DISCONNECT: 13,
-};
-
 exports.Events = {
   RATE_LIMIT: 'rateLimit',
   INVALID_REQUEST_WARNING: 'invalidRequestWarning',
   CLIENT_READY: 'ready',
+  APPLICATION_COMMAND_CREATE: 'applicationCommandCreate',
+  APPLICATION_COMMAND_DELETE: 'applicationCommandDelete',
+  APPLICATION_COMMAND_UPDATE: 'applicationCommandUpdate',
   GUILD_CREATE: 'guildCreate',
   GUILD_DELETE: 'guildDelete',
   GUILD_UPDATE: 'guildUpdate',
   GUILD_UNAVAILABLE: 'guildUnavailable',
-  GUILD_AVAILABLE: 'guildAvailable',
   GUILD_MEMBER_ADD: 'guildMemberAdd',
   GUILD_MEMBER_REMOVE: 'guildMemberRemove',
   GUILD_MEMBER_UPDATE: 'guildMemberUpdate',
   GUILD_MEMBER_AVAILABLE: 'guildMemberAvailable',
-  GUILD_MEMBER_SPEAKING: 'guildMemberSpeaking',
   GUILD_MEMBERS_CHUNK: 'guildMembersChunk',
   GUILD_INTEGRATIONS_UPDATE: 'guildIntegrationsUpdate',
   GUILD_ROLE_CREATE: 'roleCreate',
@@ -272,11 +272,9 @@ exports.Events = {
   PRESENCE_UPDATE: 'presenceUpdate',
   VOICE_SERVER_UPDATE: 'voiceServerUpdate',
   VOICE_STATE_UPDATE: 'voiceStateUpdate',
-  VOICE_BROADCAST_SUBSCRIBE: 'subscribe',
-  VOICE_BROADCAST_UNSUBSCRIBE: 'unsubscribe',
   TYPING_START: 'typingStart',
-  TYPING_STOP: 'typingStop',
   WEBHOOKS_UPDATE: 'webhookUpdate',
+  INTERACTION_CREATE: 'interaction',
   ERROR: 'error',
   WARN: 'warn',
   DEBUG: 'debug',
@@ -287,6 +285,9 @@ exports.Events = {
   SHARD_RESUME: 'shardResume',
   INVALIDATED: 'invalidated',
   RAW: 'raw',
+  STAGE_INSTANCE_CREATE: 'stageInstanceCreate',
+  STAGE_INSTANCE_UPDATE: 'stageInstanceUpdate',
+  STAGE_INSTANCE_DELETE: 'stageInstanceDelete',
 };
 
 exports.ShardEvents = {
@@ -315,6 +316,9 @@ exports.PartialTypes = keyMirror(['USER', 'CHANNEL', 'GUILD_MEMBER', 'MESSAGE', 
  * The type of a websocket message event, e.g. `MESSAGE_CREATE`. Here are the available events:
  * * READY
  * * RESUMED
+ * * APPLICATION_COMMAND_CREATE
+ * * APPLICATION_COMMAND_DELETE
+ * * APPLICATION_COMMAND_UPDATE
  * * GUILD_CREATE
  * * GUILD_DELETE
  * * GUILD_UPDATE
@@ -349,11 +353,18 @@ exports.PartialTypes = keyMirror(['USER', 'CHANNEL', 'GUILD_MEMBER', 'MESSAGE', 
  * * VOICE_STATE_UPDATE
  * * VOICE_SERVER_UPDATE
  * * WEBHOOKS_UPDATE
+ * * INTERACTION_CREATE
+ * * STAGE_INSTANCE_CREATE
+ * * STAGE_INSTANCE_UPDATE
+ * * STAGE_INSTANCE_DELETE
  * @typedef {string} WSEventType
  */
 exports.WSEvents = keyMirror([
   'READY',
   'RESUMED',
+  'APPLICATION_COMMAND_CREATE',
+  'APPLICATION_COMMAND_DELETE',
+  'APPLICATION_COMMAND_UPDATE',
   'GUILD_CREATE',
   'GUILD_DELETE',
   'GUILD_UPDATE',
@@ -389,6 +400,10 @@ exports.WSEvents = keyMirror([
   'VOICE_STATE_UPDATE',
   'VOICE_SERVER_UPDATE',
   'WEBHOOKS_UPDATE',
+  'INTERACTION_CREATE',
+  'STAGE_INSTANCE_CREATE',
+  'STAGE_INSTANCE_UPDATE',
+  'STAGE_INSTANCE_DELETE',
 ]);
 
 /**
@@ -441,6 +456,7 @@ exports.InviteScopes = [
  * * GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING
  * * GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING
  * * REPLY
+ * * APPLICATION_COMMAND
  * @typedef {string} MessageType
  */
 exports.MessageTypes = [
@@ -464,28 +480,32 @@ exports.MessageTypes = [
   'GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING',
   null,
   'REPLY',
+  'APPLICATION_COMMAND',
 ];
 
 /**
  * The types of messages that are `System`. The available types are `MessageTypes` excluding:
  * * DEFAULT
  * * REPLY
+ * * APPLICATION_COMMAND
  * @typedef {string} SystemMessageType
  */
-exports.SystemMessageTypes = exports.MessageTypes.filter(type => type && type !== 'DEFAULT' && type !== 'REPLY');
+exports.SystemMessageTypes = exports.MessageTypes.filter(
+  type => type && !['DEFAULT', 'REPLY', 'APPLICATION_COMMAND'].includes(type),
+);
 
 /**
- * <info>Bots cannot set a `CUSTOM_STATUS`, it is only for custom statuses received from users</info>
+ * <info>Bots cannot set a `CUSTOM` activity type, it is only for custom statuses received from users</info>
  * The type of an activity of a users presence, e.g. `PLAYING`. Here are the available types:
  * * PLAYING
  * * STREAMING
  * * LISTENING
  * * WATCHING
- * * CUSTOM_STATUS
+ * * CUSTOM
  * * COMPETING
  * @typedef {string} ActivityType
  */
-exports.ActivityTypes = ['PLAYING', 'STREAMING', 'LISTENING', 'WATCHING', 'CUSTOM_STATUS', 'COMPETING'];
+exports.ActivityTypes = createEnum(['PLAYING', 'STREAMING', 'LISTENING', 'WATCHING', 'CUSTOM', 'COMPETING']);
 
 exports.ChannelTypes = createEnum([
   'TEXT',
@@ -510,14 +530,15 @@ exports.Colors = {
   DEFAULT: 0x000000,
   WHITE: 0xffffff,
   AQUA: 0x1abc9c,
-  GREEN: 0x2ecc71,
+  GREEN: 0x57f287,
   BLUE: 0x3498db,
-  YELLOW: 0xffff00,
+  YELLOW: 0xfee75c,
   PURPLE: 0x9b59b6,
   LUMINOUS_VIVID_PINK: 0xe91e63,
+  FUCHSIA: 0xeb459e,
   GOLD: 0xf1c40f,
   ORANGE: 0xe67e22,
-  RED: 0xe74c3c,
+  RED: 0xed4245,
   GREY: 0x95a5a6,
   NAVY: 0x34495e,
   DARK_AQUA: 0x11806a,
@@ -532,7 +553,7 @@ exports.Colors = {
   DARKER_GREY: 0x7f8c8d,
   LIGHT_GREY: 0xbcc0c0,
   DARK_NAVY: 0x2c3e50,
-  BLURPLE: 0x7289da,
+  BLURPLE: 0x5865f2,
   GREYPLE: 0x99aab5,
   DARK_BUT_NOT_BLACK: 0x2c2f33,
   NOT_QUITE_BLACK: 0x23272a,
@@ -545,7 +566,7 @@ exports.Colors = {
  * * ALL_MEMBERS
  * @typedef {string} ExplicitContentFilterLevel
  */
-exports.ExplicitContentFilterLevels = ['DISABLED', 'MEMBERS_WITHOUT_ROLES', 'ALL_MEMBERS'];
+exports.ExplicitContentFilterLevels = createEnum(['DISABLED', 'MEMBERS_WITHOUT_ROLES', 'ALL_MEMBERS']);
 
 /**
  * The value set for the verification levels for a guild:
@@ -556,7 +577,7 @@ exports.ExplicitContentFilterLevels = ['DISABLED', 'MEMBERS_WITHOUT_ROLES', 'ALL
  * * VERY_HIGH
  * @typedef {string} VerificationLevel
  */
-exports.VerificationLevels = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
+exports.VerificationLevels = createEnum(['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']);
 
 /**
  * An error encountered while performing an API request. Here are the potential errors:
@@ -577,6 +598,7 @@ exports.VerificationLevels = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
  * * UNKNOWN_WEBHOOK
  * * UNKNOWN_BAN
  * * UNKNOWN_GUILD_TEMPLATE
+ * * UNKNOWN_STAGE_INSTANCE
  * * BOT_PROHIBITED_ENDPOINT
  * * BOT_ONLY_ENDPOINT
  * * ANNOUNCEMENT_EDIT_LIMIT_EXCEEDED
@@ -590,6 +612,8 @@ exports.VerificationLevels = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
  * * MAXIMUM_CHANNELS
  * * MAXIMUM_ATTACHMENTS
  * * MAXIMUM_INVITES
+ * * MAXIMUM_ANIMATED_EMOJIS
+ * * MAXIMUM_SERVER_MEMBERS
  * * GUILD_ALREADY_HAS_TEMPLATE
  * * UNAUTHORIZED
  * * ACCOUNT_VERIFICATION_REQUIRED
@@ -625,6 +649,7 @@ exports.VerificationLevels = ['NONE', 'LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH'];
  * * INVALID_API_VERSION
  * * CANNOT_DELETE_COMMUNITY_REQUIRED_CHANNEL
  * * REACTION_BLOCKED
+ * * STAGE_ALREADY_OPEN
  * * RESOURCE_OVERLOADED
  * @typedef {string} APIError
  */
@@ -646,6 +671,7 @@ exports.APIErrors = {
   UNKNOWN_WEBHOOK: 10015,
   UNKNOWN_BAN: 10026,
   UNKNOWN_GUILD_TEMPLATE: 10057,
+  UNKNOWN_STAGE_INSTANCE: 10067,
   BOT_PROHIBITED_ENDPOINT: 20001,
   BOT_ONLY_ENDPOINT: 20002,
   ANNOUNCEMENT_EDIT_LIMIT_EXCEEDED: 20022,
@@ -659,6 +685,8 @@ exports.APIErrors = {
   MAXIMUM_CHANNELS: 30013,
   MAXIMUM_ATTACHMENTS: 30015,
   MAXIMUM_INVITES: 30016,
+  MAXIMUM_ANIMATED_EMOJIS: 30018,
+  MAXIMUM_SERVER_MEMBERS: 30019,
   GUILD_ALREADY_HAS_TEMPLATE: 30031,
   UNAUTHORIZED: 40001,
   ACCOUNT_VERIFICATION_REQUIRED: 40002,
@@ -695,49 +723,40 @@ exports.APIErrors = {
   CANNOT_DELETE_COMMUNITY_REQUIRED_CHANNEL: 50074,
   INVALID_STICKER_SENT: 50081,
   REACTION_BLOCKED: 90001,
+  STAGE_ALREADY_OPEN: 150006,
   RESOURCE_OVERLOADED: 130000,
 };
 
 /**
- * The value set for a guild's default message notifications, e.g. `ALL`. Here are the available types:
- * * ALL
- * * MENTIONS
- * @typedef {string} DefaultMessageNotifications
+ * The value set for a guild's default message notifications, e.g. `ALL_MESSAGES`. Here are the available types:
+ * * ALL_MESSAGES
+ * * ONLY_MENTIONS
+ * @typedef {string} DefaultMessageNotificationLevel
  */
-exports.DefaultMessageNotifications = ['ALL', 'MENTIONS'];
+exports.DefaultMessageNotificationLevels = createEnum(['ALL_MESSAGES', 'ONLY_MENTIONS']);
 
 /**
  * The value set for a team members's membership state:
  * * INVITED
  * * ACCEPTED
- * @typedef {string} MembershipStates
+ * @typedef {string} MembershipState
  */
-exports.MembershipStates = [
-  // They start at 1
-  null,
-  'INVITED',
-  'ACCEPTED',
-];
+exports.MembershipStates = createEnum([null, 'INVITED', 'ACCEPTED']);
 
 /**
  * The value set for a webhook's type:
  * * Incoming
  * * Channel Follower
- * @typedef {string} WebhookTypes
+ * @typedef {string} WebhookType
  */
-exports.WebhookTypes = [
-  // They start at 1
-  null,
-  'Incoming',
-  'Channel Follower',
-];
+exports.WebhookTypes = createEnum([null, 'Incoming', 'Channel Follower']);
 
 /**
  * The value set for a sticker's type:
  * * PNG
  * * APNG
  * * LOTTIE
- * @typedef {string} StickerFormatTypes
+ * @typedef {string} StickerFormatType
  */
 exports.StickerFormatTypes = createEnum([null, 'PNG', 'APNG', 'LOTTIE']);
 
@@ -748,6 +767,124 @@ exports.StickerFormatTypes = createEnum([null, 'PNG', 'APNG', 'LOTTIE']);
  * @typedef {string} OverwriteType
  */
 exports.OverwriteTypes = createEnum(['role', 'member']);
+
+/**
+ * The type of an {@link ApplicationCommandOption} object:
+ * * SUB_COMMAND
+ * * SUB_COMMAND_GROUP
+ * * STRING
+ * * INTEGER
+ * * BOOLEAN
+ * * USER
+ * * CHANNEL
+ * * ROLE
+ * * MENTIONABLE
+ * @typedef {string} ApplicationCommandOptionType
+ */
+exports.ApplicationCommandOptionTypes = createEnum([
+  null,
+  'SUB_COMMAND',
+  'SUB_COMMAND_GROUP',
+  'STRING',
+  'INTEGER',
+  'BOOLEAN',
+  'USER',
+  'CHANNEL',
+  'ROLE',
+  'MENTIONABLE',
+]);
+
+/**
+ * The type of an {@link ApplicationCommandPermissions} object:
+ * * ROLE
+ * * USER
+ * @typedef {string} ApplicationCommandPermissionType
+ */
+exports.ApplicationCommandPermissionTypes = createEnum([null, 'ROLE', 'USER']);
+
+/**
+ * The type of an {@link Interaction} object:
+ * * PING
+ * * APPLICATION_COMMAND
+ * * MESSAGE_COMPONENT
+ * @typedef {string} InteractionType
+ */
+exports.InteractionTypes = createEnum([null, 'PING', 'APPLICATION_COMMAND', 'MESSAGE_COMPONENT']);
+
+/**
+ * The type of an interaction response:
+ * * PONG
+ * * CHANNEL_MESSAGE_WITH_SOURCE
+ * * DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+ * * DEFERRED_MESSAGE_UPDATE
+ * * UPDATE_MESSAGE
+ * @typedef {string} InteractionResponseType
+ */
+exports.InteractionResponseTypes = createEnum([
+  null,
+  'PONG',
+  null,
+  null,
+  'CHANNEL_MESSAGE_WITH_SOURCE',
+  'DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE',
+  'DEFERRED_MESSAGE_UPDATE',
+  'UPDATE_MESSAGE',
+]);
+
+/**
+ * The type of a message component
+ * * ACTION_ROW
+ * * BUTTON
+ * @typedef {string} MessageComponentType
+ */
+exports.MessageComponentTypes = createEnum([null, 'ACTION_ROW', 'BUTTON']);
+
+/**
+ * The style of a message button
+ * * PRIMARY
+ * * SECONDARY
+ * * SUCCESS
+ * * DANGER
+ * * LINK
+ * @typedef {string} MessageButtonStyle
+ */
+exports.MessageButtonStyles = createEnum([null, 'PRIMARY', 'SECONDARY', 'SUCCESS', 'DANGER', 'LINK']);
+
+/**
+ * The required MFA level for a guild
+ * * NONE
+ * * ELEVATED
+ * @typedef {string} MFALevel
+ */
+exports.MFALevels = createEnum(['NONE', 'ELEVATED']);
+
+/**
+ * NSFW level of a Guild:
+ * * DEFAULT
+ * * EXPLICIT
+ * * SAFE
+ * * AGE_RESTRICTED
+ * @typedef {string} NSFWLevel
+ */
+exports.NSFWLevels = createEnum(['DEFAULT', 'EXPLICIT', 'SAFE', 'AGE_RESTRICTED']);
+
+/**
+ * Privacy level of a {@link StageInstance} object:
+ * * PUBLIC
+ * * GUILD_ONLY
+ * @typedef {string} PrivacyLevel
+ */
+exports.PrivacyLevels = createEnum([null, 'PUBLIC', 'GUILD_ONLY']);
+
+/**
+ * The premium tier (Server Boost level) of a guild:
+ * * NONE
+ * * TIER_1
+ * * TIER_2
+ * * TIER_3
+ * @typedef {string} PremiumTier
+ */
+exports.PremiumTiers = createEnum(['NONE', 'TIER_1', 'TIER_2', 'TIER_3']);
 
 function keyMirror(arr) {
   let tmp = Object.create(null);

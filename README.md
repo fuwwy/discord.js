@@ -17,18 +17,6 @@
   </p>
 </div>
 
-## Table of contents
-
-- [About](#about)
-- [Installation](#installation)
-  - [Audio engines](#audio-engines)
-  - [Optional packages](#optional-packages)
-- [Example Usage](#example-usage)
-- [Links](#links)
-  - [Extensions](#extensions)
-- [Contributing](#contributing)
-- [Help](#help)
-
 ## About
 
 selfidscord.js is a fork of discord.js targeted for selfbots/user accounts.
@@ -44,27 +32,18 @@ discord.js is a powerful [Node.js](https://nodejs.org) module that allows you to
 ## Installation
 
 **Node.js 14.0.0 or newer is required.**  
-Ignore any warnings about unmet peer dependencies, as they're all optional.
 
-Without voice support: `npm install discord.js`  
-With voice support ([@discordjs/opus](https://www.npmjs.com/package/@discordjs/opus)): `npm install discord.js @discordjs/opus`  
-With voice support ([opusscript](https://www.npmjs.com/package/opusscript)): `npm install discord.js opusscript`
-
-### Audio engines
-
-The preferred audio engine is @discordjs/opus, as it performs significantly better than opusscript. When both are available, discord.js will automatically choose @discordjs/opus.
-Using opusscript is only recommended for development environments where @discordjs/opus is tough to get working.
-For production bots, using @discordjs/opus should be considered a necessity, especially if they're going to be running on multiple servers.
+```sh-session
+npm install selfdiscord.js
+```
 
 ### Optional packages
 
 - [zlib-sync](https://www.npmjs.com/package/zlib-sync) for WebSocket data compression and inflation (`npm install zlib-sync`)
 - [erlpack](https://github.com/discord/erlpack) for significantly faster WebSocket data (de)serialisation (`npm install discord/erlpack`)
-- One of the following packages can be installed for faster voice packet encryption and decryption:
-  - [sodium](https://www.npmjs.com/package/sodium) (`npm install sodium`)
-  - [libsodium.js](https://www.npmjs.com/package/libsodium-wrappers) (`npm install libsodium-wrappers`)
 - [bufferutil](https://www.npmjs.com/package/bufferutil) for a much faster WebSocket connection (`npm install bufferutil`)
 - [utf-8-validate](https://www.npmjs.com/package/utf-8-validate) in combination with `bufferutil` for much faster WebSocket processing (`npm install utf-8-validate`)
+- [@discordjs/voice](https://github.com/discordjs/voice) for interacting with the Discord Voice API
 
 ## Example usage
 
@@ -76,9 +55,9 @@ client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
 });
 
-client.on('message', msg => {
-  if (msg.content === 'ping') {
-    msg.channel.send('pong');
+client.on('message', message => {
+  if (message.content === 'ping') {
+    message.channel.send('pong');
   }
 });
 
@@ -95,7 +74,7 @@ client.login('token');
 - [Discord API Discord server](https://discord.gg/discord-api)
 - [GitHub](https://github.com/discordjs/discord.js)
 - [NPM](https://www.npmjs.com/package/discord.js)
-- [Related libraries](https://discordapi.com/unofficial/libs.html)
+- [Related libraries](https://discord.com/developers/docs/topics/community-resources#libraries)
 
 ### Extensions
 
@@ -110,4 +89,4 @@ See [the contribution guide](https://github.com/discordjs/discord.js/blob/master
 ## Help
 
 If you don't understand something in the documentation, you are experiencing problems, or you just need a gentle
-nudge in the right direction, please don't hesitate to join our official [Discord.js Server](https://discord.gg/bRCvFy9).
+nudge in the right direction, please don't hesitate to join our official [Discord.js Server](https://discord.gg/djs).

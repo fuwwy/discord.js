@@ -103,7 +103,7 @@ class Shard extends EventEmitter {
    * Forks a child process or creates a worker thread for the shard.
    * <warn>You should not need to call this manually.</warn>
    * @param {number} [timeout=30000] The amount in milliseconds to wait until the {@link Client} has become ready
-   * before resolving. (-1 or Infinity for no wait)
+   * before resolving (`-1` or `Infinity` for no wait)
    * @returns {Promise<ChildProcess>}
    */
   async spawn(timeout = 30000) {
@@ -187,13 +187,17 @@ class Shard extends EventEmitter {
   }
 
   /**
-   * Kills and restarts the shard's process/worker.
-   * @param {Object} [options] Respawn options for the shard
-   * @param {number} [options.delay=500] How long to wait between killing the process/worker and
+   * Options used to respawn a shard.
+   * @typedef {Object} ShardRespawnOptions
+   * @property {number} [delay=500] How long to wait between killing the process/worker and
    * restarting it (in milliseconds)
-   * @param {number} [options.timeout=30000] The amount in milliseconds to wait until the {@link Client}
-   * has become ready
-   * before resolving. (-1 or Infinity for no wait)
+   * @property {number} [timeout=30000] The amount in milliseconds to wait until the {@link Client}
+   * has become ready before resolving (`-1` or `Infinity` for no wait)
+   */
+
+  /**
+   * Kills and restarts the shard's process/worker.
+   * @param {ShardRespawnOptions} [options] Options for respawning the shard
    * @returns {Promise<ChildProcess>}
    */
   async respawn({ delay = 500, timeout = 30000 } = {}) {
@@ -348,7 +352,7 @@ class Shard extends EventEmitter {
       // Shard is requesting an eval broadcast
       if (message._sEval) {
         const resp = { _sEval: message._sEval, _sEvalShard: message._sEvalShard };
-        this.manager.broadcastEval(message._sEval, message._sEvalShard).then(
+        this.manager._performOnShards('eval', [message._sEval], message._sEvalShard).then(
           results => this.send({ ...resp, _result: results }),
           err => this.send({ ...resp, _error: Util.makePlainError(err) }),
         );

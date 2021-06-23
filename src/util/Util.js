@@ -57,15 +57,27 @@ class Util {
 
   /**
    * Splits a string into multiple chunks at a designated character that do not exceed a specific length.
-   * @param {StringResolvable} text Content to split
+   * @param {string} text Content to split
    * @param {SplitOptions} [options] Options controlling the behavior of the split
    * @returns {string[]}
    */
   static splitMessage(text, { maxLength = 2000, char = '\n', prepend = '', append = '' } = {}) {
-    text = Util.resolveString(text);
+    text = Util.verifyString(text, RangeError, 'MESSAGE_CONTENT_TYPE', false);
     if (text.length <= maxLength) return [text];
-    const splitText = text.split(char);
-    if (splitText.some(chunk => chunk.length > maxLength)) throw new RangeError('SPLIT_MAX_LEN');
+    let splitText = [text];
+    if (Array.isArray(char)) {
+      while (char.length > 0 && splitText.some(elem => elem.length > maxLength)) {
+        const currentChar = char.shift();
+        if (currentChar instanceof RegExp) {
+          splitText = splitText.map(chunk => chunk.match(currentChar));
+        } else {
+          splitText = splitText.map(chunk => chunk.split(currentChar));
+        }
+      }
+    } else {
+      splitText = text.split(char);
+    }
+    if (splitText.some(elem => elem.length > maxLength)) throw new RangeError('SPLIT_MAX_LEN');
     const messages = [];
     let msg = '';
     for (const chunk of splitText) {
@@ -79,18 +91,23 @@ class Util {
   }
 
   /**
+   * Options used to escape markdown.
+   * @typedef {Object} EscapeMarkdownOptions
+   * @property {boolean} [codeBlock=true] Whether to escape code blocks or not
+   * @property {boolean} [inlineCode=true] Whether to escape inline code or not
+   * @property {boolean} [bold=true] Whether to escape bolds or not
+   * @property {boolean} [italic=true] Whether to escape italics or not
+   * @property {boolean} [underline=true] Whether to escape underlines or not
+   * @property {boolean} [strikethrough=true] Whether to escape strikethroughs or not
+   * @property {boolean} [spoiler=true] Whether to escape spoilers or not
+   * @property {boolean} [codeBlockContent=true] Whether to escape text inside code blocks or not
+   * @property {boolean} [inlineCodeContent=true] Whether to escape text inside inline code or not
+   */
+
+  /**
    * Escapes any Discord-flavour markdown in a string.
    * @param {string} text Content to escape
-   * @param {Object} [options={}] What types of markdown to escape
-   * @param {boolean} [options.codeBlock=true] Whether to escape code blocks or not
-   * @param {boolean} [options.inlineCode=true] Whether to escape inline code or not
-   * @param {boolean} [options.bold=true] Whether to escape bolds or not
-   * @param {boolean} [options.italic=true] Whether to escape italics or not
-   * @param {boolean} [options.underline=true] Whether to escape underlines or not
-   * @param {boolean} [options.strikethrough=true] Whether to escape strikethroughs or not
-   * @param {boolean} [options.spoiler=true] Whether to escape spoilers or not
-   * @param {boolean} [options.codeBlockContent=true] Whether to escape text inside code blocks or not
-   * @param {boolean} [options.inlineCodeContent=true] Whether to escape text inside inline code or not
+   * @param {EscapeMarkdownOptions} [options={}] Options for escaping the markdown
    * @returns {string}
    */
   static escapeMarkdown(
@@ -268,6 +285,20 @@ class Util {
   }
 
   /**
+   * Resolves a partial emoji object from an {@link EmojiIdentifierResolvable}, without checking a Client.
+   * @param {EmojiIdentifierResolvable} emoji Emoji identifier to resolve
+   * @returns {?RawEmoji}
+   * @private
+   */
+  static resolvePartialEmoji(emoji) {
+    if (!emoji) return null;
+    if (typeof emoji === 'string') return /^\d{17,19}$/.test(emoji) ? { id: emoji } : Util.parseEmoji(emoji);
+    const { id, name, animated } = emoji;
+    if (!id && !name) return null;
+    return { id, name, animated };
+  }
+
+  /**
    * Shallow-copies an object with its class/prototype intact.
    * @param {Object} obj Object to clone
    * @returns {Object}
@@ -298,11 +329,16 @@ class Util {
   }
 
   /**
+   * Options used to make an error object.
+   * @typedef {Object} MakeErrorOptions
+   * @property {string} name Error type
+   * @property {string} message Message for the error
+   * @property {string} stack Stack for the error
+   */
+
+  /**
    * Makes an Error from a plain info object.
-   * @param {Object} obj Error info
-   * @param {string} obj.name Error type
-   * @param {string} obj.message Message for the error
-   * @param {string} obj.stack Stack for the error
+   * @param {MakeErrorOptions} obj Error info
    * @returns {Error}
    * @private
    */
@@ -316,7 +352,7 @@ class Util {
   /**
    * Makes a plain error info object from an Error.
    * @param {Error} err Error to get info from
-   * @returns {Object}
+   * @returns {MakeErrorOptions}
    * @private
    */
   static makePlainError(err) {
@@ -347,22 +383,22 @@ class Util {
   }
 
   /**
-   * Data that can be resolved to give a string. This can be:
-   * * A string
-   * * An array (joined with a new line delimiter to give a string)
-   * * Any value
-   * @typedef {string|Array|*} StringResolvable
-   */
-
-  /**
-   * Resolves a StringResolvable to a string.
-   * @param {StringResolvable} data The string resolvable to resolve
+   * Verifies the provided data is a string, otherwise throws provided error.
+   * @param {string} data The string resolvable to resolve
+   * @param {Function} [error] The Error constructor to instantiate. Defaults to Error
+   * @param {string} [errorMessage] The error message to throw with. Defaults to "Expected string, got <data> instead."
+   * @param {boolean} [allowEmpty=true] Whether an empty string should be allowed
    * @returns {string}
    */
-  static resolveString(data) {
-    if (typeof data === 'string') return data;
-    if (Array.isArray(data)) return data.join('\n');
-    return String(data);
+  static verifyString(
+    data,
+    error = Error,
+    errorMessage = `Expected a string, got ${data} instead.`,
+    allowEmpty = true,
+  ) {
+    if (typeof data !== 'string') throw new error(errorMessage);
+    if (!allowEmpty && data.length === 0) throw new error(errorMessage);
+    return data;
   }
 
   /**
@@ -379,11 +415,11 @@ class Util {
    * - `YELLOW`
    * - `PURPLE`
    * - `LUMINOUS_VIVID_PINK`
+   * - `FUCHSIA`
    * - `GOLD`
    * - `ORANGE`
    * - `RED`
    * - `GREY`
-   * - `DARKER_GREY`
    * - `NAVY`
    * - `DARK_AQUA`
    * - `DARK_GREEN`
@@ -394,6 +430,7 @@ class Util {
    * - `DARK_ORANGE`
    * - `DARK_RED`
    * - `DARK_GREY`
+   * - `DARKER_GREY`
    * - `LIGHT_GREY`
    * - `DARK_NAVY`
    * - `BLURPLE`

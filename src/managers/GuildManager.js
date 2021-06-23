@@ -6,12 +6,14 @@ const GuildChannel = require('../structures/GuildChannel');
 const GuildEmoji = require('../structures/GuildEmoji');
 const GuildMember = require('../structures/GuildMember');
 const Invite = require('../structures/Invite');
+const OAuth2Guild = require('../structures/OAuth2Guild');
 const Role = require('../structures/Role');
+const Collection = require('../util/Collection');
 const {
   ChannelTypes,
   Events,
   VerificationLevels,
-  DefaultMessageNotifications,
+  DefaultMessageNotificationLevels,
   ExplicitContentFilterLevels,
 } = require('../util/Constants');
 const DataResolver = require('../util/DataResolver');
@@ -48,7 +50,7 @@ class GuildManager extends BaseManager {
   /**
    * Partial data for a Role.
    * @typedef {Object} PartialRoleData
-   * @property {number} [id] The ID for this role, used to set channel overrides,
+   * @property {Snowflake|number} [id] The ID for this role, used to set channel overrides,
    * this is a placeholder and will be replaced by the API after consumption
    * @property {string} [name] The name of the role
    * @property {ColorResolvable} [color] The color of the role, either a hex string or a base 10 number
@@ -61,7 +63,7 @@ class GuildManager extends BaseManager {
   /**
    * Partial overwrite data.
    * @typedef {Object} PartialOverwriteData
-   * @property {number|Snowflake} id The Role or User ID for this overwrite
+   * @property {Snowflake|number} id The Role or User ID for this overwrite
    * @property {string} [type] The type of this overwrite
    * @property {PermissionResolvable} [allow] The permissions to allow
    * @property {PermissionResolvable} [deny] The permissions to deny
@@ -70,16 +72,16 @@ class GuildManager extends BaseManager {
   /**
    * Partial data for a Channel.
    * @typedef {Object} PartialChannelData
-   * @property {number} [id] The ID for this channel, used to set its parent,
+   * @property {Snowflake|number} [id] The ID for this channel, used to set its parent,
    * this is a placeholder and will be replaced by the API after consumption
-   * @property {number} [parentID] The parent ID for this channel
+   * @property {Snowflake|number} [parentID] The parent ID for this channel
    * @property {string} [type] The type of the channel
    * @property {string} name The name of the channel
    * @property {string} [topic] The topic of the text channel
    * @property {boolean} [nsfw] Whether the channel is NSFW
    * @property {number} [bitrate] The bitrate of the voice channel
    * @property {number} [userLimit] The user limit of the channel
-   * @property {PartialOverwriteData} [permissionOverwrites]
+   * @property {PartialOverwriteData[]} [permissionOverwrites]
    * Overwrites of the channel
    * @property {number} [rateLimitPerUser] The rate limit per user of the channel in seconds
    */
@@ -127,23 +129,27 @@ class GuildManager extends BaseManager {
   }
 
   /**
+   * Options used to create a guild.
+   * @typedef {Object} GuildCreateOptions
+   * @property {Snowflake|number} [afkChannelID] The ID of the AFK channel
+   * @property {number} [afkTimeout] The AFK timeout in seconds
+   * @property {PartialChannelData[]} [channels=[]] The channels for this guild
+   * @property {DefaultMessageNotifications} [defaultMessageNotifications] The default message notifications
+   * for the guild
+   * @property {ExplicitContentFilterLevel} [explicitContentFilter] The explicit content filter level for the guild
+   * @property {BufferResolvable|Base64Resolvable} [icon=null] The icon for the guild
+   * @property {PartialRoleData[]} [roles=[]] The roles for this guild,
+   * the first element of this array is used to change properties of the guild's everyone role.
+   * @property {Snowflake|number} [systemChannelID] The ID of the system channel
+   * @property {SystemChannelFlagsResolvable} [systemChannelFlags] The flags of the system channel
+   * @property {VerificationLevel} [verificationLevel] The verification level for the guild
+   */
+
+  /**
    * Creates a guild.
    * <warn>This is only available to bots in fewer than 10 guilds.</warn>
    * @param {string} name The name of the guild
-   * @param {Object} [options] Options for the creating
-   * @param {number} [options.afkChannelID] The ID of the AFK channel
-   * @param {number} [options.afkTimeout] The AFK timeout in seconds
-   * @param {PartialChannelData[]} [options.channels] The channels for this guild
-   * @param {DefaultMessageNotifications} [options.defaultMessageNotifications] The default message notifications
-   * for the guild
-   * @param {ExplicitContentFilterLevel} [options.explicitContentFilter] The explicit content filter level for the guild
-   * @param {BufferResolvable|Base64Resolvable} [options.icon=null] The icon for the guild
-   * @param {string} [options.region] The region for the server, defaults to the closest one available
-   * @param {PartialRoleData[]} [options.roles] The roles for this guild,
-   * the first element of this array is used to change properties of the guild's everyone role.
-   * @param {number} [options.systemChannelID] The ID of the system channel
-   * @param {SystemChannelFlagsResolvable} [options.systemChannelFlags] The flags of the system channel
-   * @param {VerificationLevel} [options.verificationLevel] The verification level for the guild
+   * @param {GuildCreateOptions} [options] Options for creating the guild
    * @returns {Promise<Guild>} The guild that was created
    */
   async create(
@@ -155,7 +161,6 @@ class GuildManager extends BaseManager {
       defaultMessageNotifications,
       explicitContentFilter,
       icon = null,
-      region,
       roles = [],
       systemChannelID,
       systemChannelFlags,
@@ -163,14 +168,14 @@ class GuildManager extends BaseManager {
     } = {},
   ) {
     icon = await DataResolver.resolveImage(icon);
-    if (typeof verificationLevel !== 'undefined' && typeof verificationLevel !== 'number') {
-      verificationLevel = VerificationLevels.indexOf(verificationLevel);
+    if (typeof verificationLevel === 'string') {
+      verificationLevel = VerificationLevels[verificationLevel];
     }
-    if (typeof defaultMessageNotifications !== 'undefined' && typeof defaultMessageNotifications !== 'number') {
-      defaultMessageNotifications = DefaultMessageNotifications.indexOf(defaultMessageNotifications);
+    if (typeof defaultMessageNotifications === 'string') {
+      defaultMessageNotifications = DefaultMessageNotificationLevels[defaultMessageNotifications];
     }
-    if (typeof explicitContentFilter !== 'undefined' && typeof explicitContentFilter !== 'number') {
-      explicitContentFilter = ExplicitContentFilterLevels.indexOf(explicitContentFilter);
+    if (typeof explicitContentFilter === 'string') {
+      explicitContentFilter = ExplicitContentFilterLevels[explicitContentFilter];
     }
     for (const channel of channels) {
       if (channel.type) channel.type = ChannelTypes[channel.type.toUpperCase()];
@@ -188,12 +193,13 @@ class GuildManager extends BaseManager {
       if (role.color) role.color = resolveColor(role.color);
       if (role.permissions) role.permissions = Permissions.resolve(role.permissions).toString();
     }
+    if (systemChannelFlags) systemChannelFlags = SystemChannelFlags.resolve(systemChannelFlags);
+
     return new Promise((resolve, reject) =>
       this.client.api.guilds
         .post({
           data: {
             name,
-            region,
             icon,
             verification_level: verificationLevel,
             default_message_notifications: defaultMessageNotifications,
@@ -203,7 +209,7 @@ class GuildManager extends BaseManager {
             afk_channel_id: afkChannelID,
             afk_timeout: afkTimeout,
             system_channel_id: systemChannelID,
-            system_channel_flags: SystemChannelFlags.resolve(systemChannelFlags),
+            system_channel_flags: systemChannelFlags,
           },
         })
         .then(data => {
@@ -231,25 +237,39 @@ class GuildManager extends BaseManager {
   }
 
   /**
-   * Obtains a guild from Discord, or the guild cache if it's already available.
-   * @param {Snowflake} id ID of the guild
-   * @param {boolean} [cache=true] Whether to cache the new guild object if it isn't already
-   * @param {boolean} [force=false] Whether to skip the cache check and request the API
-   * @returns {Promise<Guild>}
-   * @example
-   * // Fetch a guild by its id
-   * client.guilds.fetch('222078108977594368')
-   *   .then(guild => console.log(guild.name))
-   *   .catch(console.error);
+   * Options used to fetch a single guild.
+   * @typedef {BaseFetchOptions} FetchGuildOptions
+   * @property {GuildResolvable} guild The guild to fetch
    */
-  async fetch(id, cache = true, force = false) {
-    if (!force) {
-      const existing = this.cache.get(id);
-      if (existing) return existing;
+
+  /**
+   * Options used to fetch multiple guilds.
+   * @typedef {Object} FetchGuildsOptions
+   * @property {Snowflake} [before] Get guilds before this guild ID
+   * @property {Snowflake} [after] Get guilds after this guild ID
+   * @property {number} [limit=100] Maximum number of guilds to request (1-100)
+   */
+
+  /**
+   * Obtains one or multiple guilds from Discord, or the guild cache if it's already available.
+   * @param {GuildResolvable|FetchGuildOptions|FetchGuildsOptions} [options] ID of the guild or options
+   * @returns {Promise<Guild|Collection<Snowflake, OAuth2Guild>>}
+   */
+  async fetch(options = {}) {
+    const id = this.resolveID(options) ?? this.resolveID(options.guild);
+
+    if (id) {
+      if (!options.force) {
+        const existing = this.cache.get(id);
+        if (existing) return existing;
+      }
+
+      const data = await this.client.api.guilds(id).get({ query: { with_counts: true } });
+      return this.add(data, options.cache);
     }
 
-    const data = await this.client.api.guilds(id).get({ query: { with_counts: true } });
-    return this.add(data, cache);
+    const data = await this.client.api.users('@me').guilds.get({ query: options });
+    return data.reduce((coll, guild) => coll.set(guild.id, new OAuth2Guild(this.client, guild)), new Collection());
   }
 }
 

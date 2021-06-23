@@ -110,7 +110,7 @@ class PermissionOverwrites {
    */
 
   /**
-   * @typedef {object} ResolvedOverwriteOptions
+   * @typedef {Object} ResolvedOverwriteOptions
    * @property {Permissions} allow The allowed permissions
    * @property {Permissions} deny The denied permissions
    */
@@ -178,8 +178,8 @@ class PermissionOverwrites {
       return {
         id: overwrite.id,
         type: OverwriteTypes[overwrite.type],
-        allow: Permissions.resolve(overwrite.allow).toString(),
-        deny: Permissions.resolve(overwrite.deny).toString(),
+        allow: Permissions.resolve(overwrite.allow ?? Permissions.defaultBit).toString(),
+        deny: Permissions.resolve(overwrite.deny ?? Permissions.defaultBit).toString(),
       };
     }
 
@@ -190,8 +190,8 @@ class PermissionOverwrites {
     return {
       id: userOrRole.id,
       type,
-      allow: Permissions.resolve(overwrite.allow).toString(),
-      deny: Permissions.resolve(overwrite.deny).toString(),
+      allow: Permissions.resolve(overwrite.allow ?? Permissions.defaultBit).toString(),
+      deny: Permissions.resolve(overwrite.deny ?? Permissions.defaultBit).toString(),
     };
   }
 }

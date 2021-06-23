@@ -1,6 +1,7 @@
 'use strict';
 
 const Integration = require('./Integration');
+const StageInstance = require('./StageInstance');
 const Webhook = require('./Webhook');
 const Collection = require('../util/Collection');
 const { OverwriteTypes, PartialTypes } = require('../util/Constants');
@@ -19,6 +20,7 @@ const Util = require('../util/Util');
  * * EMOJI
  * * MESSAGE
  * * INTEGRATION
+ * * STAGE_INSTANCE
  * @typedef {string} AuditLogTargetType
  */
 
@@ -38,6 +40,7 @@ const Targets = {
   EMOJI: 'EMOJI',
   MESSAGE: 'MESSAGE',
   INTEGRATION: 'INTEGRATION',
+  STAGE_INSTANCE: 'STAGE_INSTANCE',
   UNKNOWN: 'UNKNOWN',
 };
 
@@ -79,7 +82,10 @@ const Targets = {
  * * INTEGRATION_CREATE: 80
  * * INTEGRATION_UPDATE: 81
  * * INTEGRATION_DELETE: 82
- * @typedef {?number|string} AuditLogAction
+ * * STAGE_INSTANCE_CREATE: 83
+ * * STAGE_INSTANCE_UPDATE: 84
+ * * STAGE_INSTANCE_DELETE: 85
+ * @typedef {?(number|string)} AuditLogAction
  */
 
 /**
@@ -124,6 +130,9 @@ const Actions = {
   INTEGRATION_CREATE: 80,
   INTEGRATION_UPDATE: 81,
   INTEGRATION_DELETE: 82,
+  STAGE_INSTANCE_CREATE: 83,
+  STAGE_INSTANCE_UPDATE: 84,
+  STAGE_INSTANCE_DELETE: 85,
 };
 
 /**
@@ -179,15 +188,19 @@ class GuildAuditLogs {
   /**
    * The target of an entry. It can be one of:
    * * A guild
+   * * A channel
    * * A user
    * * A role
-   * * An emoji
    * * An invite
    * * A webhook
+   * * An emoji
+   * * A message
    * * An integration
+   * * A stage instance
    * * An object with an id key if target was deleted
    * * An object where the keys represent either the new value or the old value
-   * @typedef {?Object|Guild|User|Role|GuildEmoji|Invite|Webhook|Integration} AuditLogEntryTarget
+   * @typedef {?(Object|Guild|Channel|User|Role|Invite|Webhook|GuildEmoji|Message|Integration|StageInstance)}
+   * AuditLogEntryTarget
    */
 
   /**
@@ -204,7 +217,8 @@ class GuildAuditLogs {
     if (target < 60) return Targets.WEBHOOK;
     if (target < 70) return Targets.EMOJI;
     if (target < 80) return Targets.MESSAGE;
-    if (target < 90) return Targets.INTEGRATION;
+    if (target < 83) return Targets.INTEGRATION;
+    if (target < 86) return Targets.STAGE_INSTANCE;
     return Targets.UNKNOWN;
   }
 
@@ -235,6 +249,7 @@ class GuildAuditLogs {
         Actions.EMOJI_CREATE,
         Actions.MESSAGE_PIN,
         Actions.INTEGRATION_CREATE,
+        Actions.STAGE_INSTANCE_CREATE,
       ].includes(action)
     ) {
       return 'CREATE';
@@ -256,6 +271,7 @@ class GuildAuditLogs {
         Actions.MESSAGE_BULK_DELETE,
         Actions.MESSAGE_UNPIN,
         Actions.INTEGRATION_DELETE,
+        Actions.STAGE_INSTANCE_DELETE,
       ].includes(action)
     ) {
       return 'DELETE';
@@ -274,6 +290,7 @@ class GuildAuditLogs {
         Actions.WEBHOOK_UPDATE,
         Actions.EMOJI_UPDATE,
         Actions.INTEGRATION_UPDATE,
+        Actions.STAGE_INSTANCE_UPDATE,
       ].includes(action)
     ) {
       return 'UPDATE';
@@ -329,7 +346,7 @@ class GuildAuditLogsEntry {
 
     /**
      * An entry in the audit log representing a specific change.
-     * @typedef {object} AuditLogChange
+     * @typedef {Object} AuditLogChange
      * @property {string} key The property that was changed, e.g. `nick` for nickname changes
      * @property {*} [old] The old value of the change, e.g. for nicknames, the old nickname
      * @property {*} [new] The new value of the change, e.g. for nicknames, the new nickname
@@ -349,7 +366,7 @@ class GuildAuditLogsEntry {
 
     /**
      * Any extra data from the entry
-     * @type {?Object|Role|GuildMember}
+     * @type {?(Object|Role|GuildMember)}
      */
     this.extra = null;
     switch (data.action_type) {
@@ -364,7 +381,7 @@ class GuildAuditLogsEntry {
       case Actions.MESSAGE_DELETE:
       case Actions.MESSAGE_BULK_DELETE:
         this.extra = {
-          channel: guild.channels.cache.get(data.options.channel_id) || { id: data.options.channel_id },
+          channel: guild.channels.cache.get(data.options.channel_id) ?? { id: data.options.channel_id },
           count: Number(data.options.count),
         };
         break;
@@ -372,7 +389,7 @@ class GuildAuditLogsEntry {
       case Actions.MESSAGE_PIN:
       case Actions.MESSAGE_UNPIN:
         this.extra = {
-          channel: guild.client.channels.cache.get(data.options.channel_id) || { id: data.options.channel_id },
+          channel: guild.client.channels.cache.get(data.options.channel_id) ?? { id: data.options.channel_id },
           messageID: data.options.message_id,
         };
         break;
@@ -388,7 +405,7 @@ class GuildAuditLogsEntry {
       case Actions.CHANNEL_OVERWRITE_DELETE:
         switch (Number(data.options.type)) {
           case OverwriteTypes.role:
-            this.extra = guild.roles.cache.get(data.options.id) || {
+            this.extra = guild.roles.cache.get(data.options.id) ?? {
               id: data.options.id,
               name: data.options.role_name,
               type: OverwriteTypes[OverwriteTypes.role],
@@ -396,7 +413,7 @@ class GuildAuditLogsEntry {
             break;
 
           case OverwriteTypes.member:
-            this.extra = guild.members.cache.get(data.options.id) || {
+            this.extra = guild.members.cache.get(data.options.id) ?? {
               id: data.options.id,
               type: OverwriteTypes[OverwriteTypes.member],
             };
@@ -405,6 +422,14 @@ class GuildAuditLogsEntry {
           default:
             break;
         }
+        break;
+
+      case Actions.STAGE_INSTANCE_CREATE:
+      case Actions.STAGE_INSTANCE_DELETE:
+      case Actions.STAGE_INSTANCE_UPDATE:
+        this.extra = {
+          channel: guild.client.channels.cache.get(data.options?.channel_id) ?? { id: data.options?.channel_id },
+        };
         break;
 
       default:
@@ -480,8 +505,35 @@ class GuildAuditLogsEntry {
           ),
           guild,
         );
+    } else if (targetType === Targets.CHANNEL) {
+      this.target =
+        guild.channels.cache.get(data.target_id) ||
+        this.changes.reduce(
+          (o, c) => {
+            o[c.key] = c.new || c.old;
+            return o;
+          },
+          { id: data.target_id },
+        );
+    } else if (targetType === Targets.STAGE_INSTANCE) {
+      this.target =
+        guild.stageInstances.cache.get(data.target_id) ??
+        new StageInstance(
+          guild.client,
+          this.changes.reduce(
+            (o, c) => {
+              o[c.key] = c.new || c.old;
+              return o;
+            },
+            {
+              id: data.target_id,
+              channel_id: data.options?.channel_id,
+              guild_id: guild.id,
+            },
+          ),
+        );
     } else if (data.target_id) {
-      this.target = guild[`${targetType.toLowerCase()}s`].cache.get(data.target_id) || { id: data.target_id };
+      this.target = guild[`${targetType.toLowerCase()}s`]?.cache.get(data.target_id) || { id: data.target_id };
     }
   }
 

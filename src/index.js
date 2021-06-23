@@ -1,7 +1,5 @@
 'use strict';
 
-const Util = require('./util/Util');
-
 module.exports = {
   // "Root" classes (starting points)
   BaseClient: require('./client/BaseClient'),
@@ -21,20 +19,23 @@ module.exports = {
   BaseManager: require('./managers/BaseManager'),
   DiscordAPIError: require('./rest/DiscordAPIError'),
   HTTPError: require('./rest/HTTPError'),
+  RateLimitError: require('./rest/RateLimitError'),
   MessageFlags: require('./util/MessageFlags'),
   Intents: require('./util/Intents'),
   Permissions: require('./util/Permissions'),
-  Speaking: require('./util/Speaking'),
   SnowflakeUtil: require('./util/SnowflakeUtil'),
   Structures: require('./util/Structures'),
   SystemChannelFlags: require('./util/SystemChannelFlags'),
   UserFlags: require('./util/UserFlags'),
-  Util: Util,
+  Util: require('./util/Util'),
   version: require('../package.json').version,
 
   // Managers
+  ApplicationCommandManager: require('./managers/ApplicationCommandManager'),
   BaseGuildEmojiManager: require('./managers/BaseGuildEmojiManager'),
   ChannelManager: require('./managers/ChannelManager'),
+  GuildApplicationCommandManager: require('./managers/GuildApplicationCommandManager'),
+  GuildBanManager: require('./managers/GuildBanManager'),
   GuildChannelManager: require('./managers/GuildChannelManager'),
   GuildEmojiManager: require('./managers/GuildEmojiManager'),
   GuildEmojiRoleManager: require('./managers/GuildEmojiRoleManager'),
@@ -48,21 +49,17 @@ module.exports = {
   RoleManager: require('./managers/RoleManager'),
   UserManager: require('./managers/UserManager'),
 
-  // Shortcuts to Util methods
-  discordSort: Util.discordSort,
-  escapeMarkdown: Util.escapeMarkdown,
-  fetchRecommendedShards: Util.fetchRecommendedShards,
-  resolveColor: Util.resolveColor,
-  resolveString: Util.resolveString,
-  splitMessage: Util.splitMessage,
-
   // Structures
   Application: require('./structures/interfaces/Application'),
+  ApplicationCommand: require('./structures/ApplicationCommand'),
   Base: require('./structures/Base'),
   Activity: require('./structures/Presence').Activity,
   APIMessage: require('./structures/APIMessage'),
+  BaseGuild: require('./structures/BaseGuild'),
   BaseGuildEmoji: require('./structures/BaseGuildEmoji'),
   BaseGuildVoiceChannel: require('./structures/BaseGuildVoiceChannel'),
+  BaseMessageComponent: require('./structures/BaseMessageComponent'),
+  ButtonInteraction: require('./structures/ButtonInteraction'),
   CategoryChannel: require('./structures/CategoryChannel'),
   Channel: require('./structures/Channel'),
   ClientApplication: require('./structures/ClientApplication'),
@@ -71,10 +68,12 @@ module.exports = {
     return require('./structures/ClientUser');
   },
   Collector: require('./structures/interfaces/Collector'),
+  CommandInteraction: require('./structures/CommandInteraction'),
   DMChannel: require('./structures/DMChannel'),
   Emoji: require('./structures/Emoji'),
   Guild: require('./structures/Guild'),
   GuildAuditLogs: require('./structures/GuildAuditLogs'),
+  GuildBan: require('./structures/GuildBan'),
   GuildChannel: require('./structures/GuildChannel'),
   GuildEmoji: require('./structures/GuildEmoji'),
   GuildMember: require('./structures/GuildMember'),
@@ -82,14 +81,21 @@ module.exports = {
   GuildTemplate: require('./structures/GuildTemplate'),
   Integration: require('./structures/Integration'),
   IntegrationApplication: require('./structures/IntegrationApplication'),
+  Interaction: require('./structures/Interaction'),
+  InteractionWebhook: require('./structures/InteractionWebhook'),
   Invite: require('./structures/Invite'),
   Message: require('./structures/Message'),
+  MessageActionRow: require('./structures/MessageActionRow'),
   MessageAttachment: require('./structures/MessageAttachment'),
+  MessageButton: require('./structures/MessageButton'),
   MessageCollector: require('./structures/MessageCollector'),
+  MessageComponentInteraction: require('./structures/MessageComponentInteraction'),
+  MessageComponentInteractionCollector: require('./structures/MessageComponentInteractionCollector'),
   MessageEmbed: require('./structures/MessageEmbed'),
   MessageMentions: require('./structures/MessageMentions'),
   MessageReaction: require('./structures/MessageReaction'),
   NewsChannel: require('./structures/NewsChannel'),
+  OAuth2Guild: require('./structures/OAuth2Guild'),
   PermissionOverwrites: require('./structures/PermissionOverwrites'),
   Presence: require('./structures/Presence').Presence,
   ClientPresence: require('./structures/ClientPresence'),
@@ -108,6 +114,8 @@ module.exports = {
   VoiceRegion: require('./structures/VoiceRegion'),
   VoiceState: require('./structures/VoiceState'),
   Webhook: require('./structures/Webhook'),
+  Widget: require('./structures/Widget'),
+  WidgetMember: require('./structures/WidgetMember'),
 
   WebSocket: require('./WebSocket'),
 };
