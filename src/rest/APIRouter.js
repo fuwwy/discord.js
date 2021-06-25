@@ -34,7 +34,7 @@ function buildRoute(manager) {
               {
                 versioned: manager.versioned,
                 route: routeBucket.join('/'),
-                userAgent: manager.client.options.userAgent
+                userAgent: manager.client.options.userAgent,
               },
               options,
             ),
