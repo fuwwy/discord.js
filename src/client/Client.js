@@ -22,7 +22,6 @@ const Webhook = require('../structures/Webhook');
 const Widget = require('../structures/Widget');
 const { Events, InviteScopes, Status } = require('../util/Constants');
 const DataResolver = require('../util/DataResolver');
-const Intents = require('../util/Intents');
 const Options = require('../util/Options');
 const Permissions = require('../util/Permissions');
 

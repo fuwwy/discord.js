@@ -3270,6 +3270,7 @@ export interface ClientOptions {
   restSweepInterval?: number;
   retryLimit?: number;
   failIfNotExists?: boolean;
+  userAgent?: string;
   userAgentSuffix?: string[];
   presence?: PresenceData;
   intents: BitFieldResolvable<IntentsString, number>;
@@ -4673,19 +4674,19 @@ export interface WebhookMessageOptions extends Omit<MessageOptions, 'reply'> {
 export type WebhookType = keyof typeof WebhookTypes;
 
 export interface WebSocketOptions {
-    properties?: WebSocketProperties;
+  properties?: WebSocketProperties;
 }
 
 export interface WebSocketProperties {
-    browser?: string;
-    client_build_number?: number;
-    client_event_source?: null;
-    client_version?: string;
-    os?: string;
-    os_arch?: string;
-    os_version?: string;
-    release_channel?: string;
-    system_locale?: string;
+  browser?: string;
+  client_build_number?: number;
+  client_event_source?: null;
+  client_version?: string;
+  os?: string;
+  os_arch?: string;
+  os_version?: string;
+  release_channel?: string;
+  system_locale?: string;
 }
 
 export interface WidgetActivity {

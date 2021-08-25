@@ -122,16 +122,31 @@ class Options extends null {
       restTimeOffset: 500,
       restSweepInterval: 60,
       failIfNotExists: true,
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.37 ' +
+        'Chrome/91.0.4472.106 Electron/13.1.4 Safari/537.36',
       userAgentSuffix: [],
       presence: {},
       ws: {
-        large_threshold: 50,
         compress: false,
         properties: {
-          $os: process.platform,
-          $browser: 'discord.js',
-          $device: 'discord.js',
+          browser: 'Discord Client',
+          client_build_number: 94734,
+          client_event_source: null,
+          client_version: '1.0.37',
+          os: 'Windows',
+          os_arch: 'x64',
+          os_version: '10.0.22000',
+          release_channel: 'canary',
+          system_locale: 'en-US',
         },
+        client_state: {
+          guild_hashes: {},
+          highest_last_message_id: '0',
+          read_state_version: 0,
+          user_guild_settings_version: -1,
+        },
+        capabilities: 125,
         version: 9,
       },
       http: {
