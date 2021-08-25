@@ -37,15 +37,16 @@ class MessageActionRow extends BaseMessageComponent {
 
   /**
    * @param {MessageActionRow|MessageActionRowOptions} [data={}] MessageActionRow to clone or raw data
+   * @param {Client} [client] The client constructing this MessageActionRow, if provided
    */
-  constructor(data = {}) {
+  constructor(data = {}, client = null) {
     super({ type: 'ACTION_ROW' });
 
     /**
      * The components in this action row
      * @type {MessageActionRowComponent[]}
      */
-    this.components = (data.components ?? []).map(c => BaseMessageComponent.create(c, null, true));
+    this.components = data.components?.map(c => BaseMessageComponent.create(c, client)) ?? [];
   }
 
   /**
@@ -54,7 +55,17 @@ class MessageActionRow extends BaseMessageComponent {
    * @returns {MessageActionRow}
    */
   addComponents(...components) {
-    this.components.push(...components.flat(Infinity).map(c => BaseMessageComponent.create(c, null, true)));
+    this.components.push(...components.flat(Infinity).map(c => BaseMessageComponent.create(c)));
+    return this;
+  }
+
+  /**
+   * Sets the components of the action row.
+   * @param {...MessageActionRowComponentResolvable[]} components The components to set
+   * @returns {MessageActionRow}
+   */
+  setComponents(...components) {
+    this.spliceComponents(0, this.components.length, components);
     return this;
   }
 
@@ -66,11 +77,7 @@ class MessageActionRow extends BaseMessageComponent {
    * @returns {MessageActionRow}
    */
   spliceComponents(index, deleteCount, ...components) {
-    this.components.splice(
-      index,
-      deleteCount,
-      ...components.flat(Infinity).map(c => BaseMessageComponent.create(c, null, true)),
-    );
+    this.components.splice(index, deleteCount, ...components.flat(Infinity).map(c => BaseMessageComponent.create(c)));
     return this;
   }
 

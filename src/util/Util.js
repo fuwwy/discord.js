@@ -1,20 +1,18 @@
 'use strict';
 
 const { parse } = require('path');
+const { Collection } = require('@discordjs/collection');
 const fetch = require('node-fetch');
-const { Colors, DefaultOptions, Endpoints } = require('./Constants');
+const { Colors, Endpoints } = require('./Constants');
+const Options = require('./Options');
 const { Error: DiscordError, RangeError, TypeError } = require('../errors');
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const isObject = d => typeof d === 'object' && d !== null;
 
 /**
- * Contains various general-purpose utility methods. These functions are also available on the base `Discord` object.
+ * Contains various general-purpose utility methods.
  */
-class Util {
-  constructor() {
-    throw new Error(`The ${this.constructor.name} class may not be instantiated.`);
-  }
-
+class Util extends null {
   /**
    * Flatten an object. Any properties that are collections will get converted to an array of keys.
    * @param {Object} obj The object to flatten.
@@ -41,9 +39,9 @@ class Util {
       const valueOf = elemIsObj && typeof element.valueOf === 'function' ? element.valueOf() : null;
 
       // If it's a Collection, make the array of keys
-      if (element instanceof require('./Collection')) out[newProp] = Array.from(element.keys());
+      if (element instanceof Collection) out[newProp] = Array.from(element.keys());
       // If the valueOf is a Collection, use its array of keys
-      else if (valueOf instanceof require('./Collection')) out[newProp] = Array.from(valueOf.keys());
+      else if (valueOf instanceof Collection) out[newProp] = Array.from(valueOf.keys());
       // If it's an array, flatten each element
       else if (Array.isArray(element)) out[newProp] = element.map(e => Util.flatten(e));
       // If it's an object with a primitive `valueOf`, use that value
@@ -56,22 +54,32 @@ class Util {
   }
 
   /**
+   * Options for splitting a message.
+   * @typedef {Object} SplitOptions
+   * @property {number} [maxLength=2000] Maximum character length per message piece
+   * @property {string|string[]|RegExp|RegExp[]} [char='\n'] Character(s) or Regex(s) to split the message with,
+   * an array can be used to split multiple times
+   * @property {string} [prepend=''] Text to prepend to every piece except the first
+   * @property {string} [append=''] Text to append to every piece except the last
+   */
+
+  /**
    * Splits a string into multiple chunks at a designated character that do not exceed a specific length.
    * @param {string} text Content to split
    * @param {SplitOptions} [options] Options controlling the behavior of the split
    * @returns {string[]}
    */
   static splitMessage(text, { maxLength = 2000, char = '\n', prepend = '', append = '' } = {}) {
-    text = Util.verifyString(text, RangeError, 'MESSAGE_CONTENT_TYPE', false);
+    text = Util.verifyString(text);
     if (text.length <= maxLength) return [text];
     let splitText = [text];
     if (Array.isArray(char)) {
       while (char.length > 0 && splitText.some(elem => elem.length > maxLength)) {
         const currentChar = char.shift();
         if (currentChar instanceof RegExp) {
-          splitText = splitText.map(chunk => chunk.match(currentChar));
+          splitText = splitText.flatMap(chunk => chunk.match(currentChar));
         } else {
-          splitText = splitText.map(chunk => chunk.split(currentChar));
+          splitText = splitText.flatMap(chunk => chunk.split(currentChar));
         }
       }
     } else {
@@ -248,29 +256,36 @@ class Util {
   }
 
   /**
+   * @typedef {Object} FetchRecommendedShardsOptions
+   * @property {number} [guildsPerShard=1000] Number of guilds assigned per shard
+   * @property {number} [multipleOf=1] The multiple the shard count should round up to. (16 for large bot sharding)
+   */
+
+  /**
    * Gets the recommended shard count from Discord.
    * @param {string} token Discord auth token
-   * @param {number} [guildsPerShard=1000] Number of guilds per shard
+   * @param {FetchRecommendedShardsOptions} [options] Options for fetching the recommended shard count
    * @returns {Promise<number>} The recommended number of shards
    */
-  static fetchRecommendedShards(token, guildsPerShard = 1000) {
+  static async fetchRecommendedShards(token, { guildsPerShard = 1000, multipleOf = 1 } = {}) {
     if (!token) throw new DiscordError('TOKEN_MISSING');
-    return fetch(`${DefaultOptions.http.api}/v${DefaultOptions.http.version}${Endpoints.botGateway}`, {
+    const defaults = Options.createDefault();
+    const response = await fetch(`${defaults.http.api}/v${defaults.http.version}${Endpoints.botGateway}`, {
       method: 'GET',
       headers: { Authorization: `Bot ${token.replace(/^Bot\s*/i, '')}` },
-    })
-      .then(res => {
-        if (res.ok) return res.json();
-        if (res.status === 401) throw new DiscordError('TOKEN_INVALID');
-        throw res;
-      })
-      .then(data => data.shards * (1000 / guildsPerShard));
+    });
+    if (!response.ok) {
+      if (response.status === 401) throw new DiscordError('TOKEN_INVALID');
+      throw response;
+    }
+    const { shards } = await response.json();
+    return Math.ceil((shards * (1000 / guildsPerShard)) / multipleOf) * multipleOf;
   }
 
   /**
    * Parses emoji info out of a string. The string must be one of:
-   * * A UTF-8 emoji (no ID)
-   * * A URL-encoded UTF-8 emoji (no ID)
+   * * A UTF-8 emoji (no id)
+   * * A URL-encoded UTF-8 emoji (no id)
    * * A Discord custom emoji (`<:name:id>` or `<a:name:id>`)
    * @param {string} text Emoji string to parse
    * @returns {APIEmoji} Object with `animated`, `name`, and `id` properties
@@ -279,9 +294,8 @@ class Util {
   static parseEmoji(text) {
     if (text.includes('%')) text = decodeURIComponent(text);
     if (!text.includes(':')) return { animated: false, name: text, id: null };
-    const m = text.match(/<?(?:(a):)?(\w{2,32}):(\d{17,19})?>?/);
-    if (!m) return null;
-    return { animated: Boolean(m[1]), name: m[2], id: m[3] || null };
+    const match = text.match(/<?(?:(a):)?(\w{2,32}):(\d{17,19})?>?/);
+    return match && { animated: Boolean(match[1]), name: match[2], id: match[3] ?? null };
   }
 
   /**
@@ -450,19 +464,19 @@ class Util {
     if (typeof color === 'string') {
       if (color === 'RANDOM') return Math.floor(Math.random() * (0xffffff + 1));
       if (color === 'DEFAULT') return 0;
-      color = Colors[color] || parseInt(color.replace('#', ''), 16);
+      color = Colors[color] ?? parseInt(color.replace('#', ''), 16);
     } else if (Array.isArray(color)) {
       color = (color[0] << 16) + (color[1] << 8) + color[2];
     }
 
     if (color < 0 || color > 0xffffff) throw new RangeError('COLOR_RANGE');
-    else if (color && isNaN(color)) throw new TypeError('COLOR_CONVERT');
+    else if (Number.isNaN(color)) throw new TypeError('COLOR_CONVERT');
 
     return color;
   }
 
   /**
-   * Sorts by Discord's position and ID.
+   * Sorts by Discord's position and id.
    * @param  {Collection} collection Collection of objects to sort
    * @returns {Collection}
    */
@@ -486,11 +500,12 @@ class Util {
    * @returns {Promise<Channel[]|Role[]>} Updated item list, with `id` and `position` properties
    * @private
    */
-  static setPosition(item, position, relative, sorted, route, reason) {
-    let updatedItems = sorted.array();
+  static async setPosition(item, position, relative, sorted, route, reason) {
+    let updatedItems = [...sorted.values()];
     Util.moveElementInArray(updatedItems, item, position, relative);
     updatedItems = updatedItems.map((r, i) => ({ id: r.id, position: i }));
-    return route.patch({ data: updatedItems, reason }).then(() => updatedItems);
+    await route.patch({ data: updatedItems, reason });
+    return updatedItems;
   }
 
   /**
@@ -501,7 +516,7 @@ class Util {
    * @private
    */
   static basename(path, ext) {
-    let res = parse(path);
+    const res = parse(path);
     return ext && res.ext.startsWith(ext) ? res.name : res.base.split('?')[0];
   }
 
@@ -532,7 +547,7 @@ class Util {
    * @returns {Snowflake}
    * @private
    */
-  static binaryToID(num) {
+  static binaryToId(num) {
     let dec = '';
 
     while (num.length > 50) {
@@ -575,7 +590,7 @@ class Util {
     str = str
       .replace(/<@!?[0-9]+>/g, input => {
         const id = input.replace(/<|!|>|@/g, '');
-        if (channel.type === 'dm') {
+        if (channel.type === 'DM') {
           const user = channel.client.users.cache.get(id);
           return user ? Util.removeMentions(`@${user.username}`) : input;
         }
@@ -593,7 +608,7 @@ class Util {
         return mentionedChannel ? `#${mentionedChannel.name}` : input;
       })
       .replace(/<@&[0-9]+>/g, input => {
-        if (channel.type === 'dm') return input;
+        if (channel.type === 'DM') return input;
         const role = channel.guild.roles.cache.get(input.replace(/<|@|>|&/g, ''));
         return role ? `@${role.name}` : input;
       });
@@ -619,6 +634,21 @@ class Util {
     return new Promise(resolve => {
       setTimeout(resolve, ms);
     });
+  }
+
+  /**
+   * Creates a sweep filter that sweeps archived threads
+   * @param {number} [lifetime=14400] How long a thread has to be archived to be valid for sweeping
+   * @returns {SweepFilter}
+   */
+  static archivedThreadSweepFilter(lifetime = 14400) {
+    const filter = require('./LimitedCollection').filterByLifetime({
+      lifetime,
+      getComparisonTimestamp: e => e.archiveTimestamp,
+      excludeFromSweep: e => !e.archived,
+    });
+    filter.isDefault = true;
+    return filter;
   }
 }
 

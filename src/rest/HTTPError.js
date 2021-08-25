@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Represents a HTTP error from a request.
+ * Represents an HTTP error from a request.
  * @extends Error
  */
 class HTTPError extends Error {
@@ -18,7 +18,7 @@ class HTTPError extends Error {
      * HTTP error code returned from the request
      * @type {number}
      */
-    this.code = code || 500;
+    this.code = code ?? 500;
 
     /**
      * The HTTP method used for the request

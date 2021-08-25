@@ -3,7 +3,6 @@
 const BaseMessageComponent = require('./BaseMessageComponent');
 const MessageEmbed = require('./MessageEmbed');
 const { RangeError } = require('../errors');
-const { MessageComponentTypes } = require('../util/Constants');
 const DataResolver = require('../util/DataResolver');
 const MessageFlags = require('../util/MessageFlags');
 const Util = require('../util/Util');
@@ -11,7 +10,7 @@ const Util = require('../util/Util');
 /**
  * Represents a message to be sent to the API.
  */
-class APIMessage {
+class MessagePayload {
   /**
    * @param {MessageTarget} target - The target for this message to be sent to
    * @param {MessageOptions|WebhookMessageOptions} options - Options passed in from send
@@ -31,7 +30,7 @@ class APIMessage {
 
     /**
      * Data sendable to the API
-     * @type {?APIMessageRaw}
+     * @type {?APIMessage}
      */
     this.data = null;
 
@@ -50,7 +49,7 @@ class APIMessage {
   }
 
   /**
-   * Whether or not the target is a webhook
+   * Whether or not the target is a {@link Webhook} or a {@link WebhookClient}
    * @type {boolean}
    * @readonly
    */
@@ -61,7 +60,7 @@ class APIMessage {
   }
 
   /**
-   * Whether or not the target is a user
+   * Whether or not the target is a {@link User}
    * @type {boolean}
    * @readonly
    */
@@ -72,7 +71,7 @@ class APIMessage {
   }
 
   /**
-   * Whether or not the target is a message
+   * Whether or not the target is a {@link Message}
    * @type {boolean}
    * @readonly
    */
@@ -82,7 +81,7 @@ class APIMessage {
   }
 
   /**
-   * Wether or not the target is a message manager
+   * Wether or not the target is a {@link MessageManager}
    * @type {boolean}
    * @readonly
    */
@@ -92,7 +91,7 @@ class APIMessage {
   }
 
   /**
-   * Whether or not the target is an interaction
+   * Whether or not the target is an {@link Interaction} or an {@link InteractionWebhook}
    * @type {boolean}
    * @readonly
    */
@@ -104,7 +103,7 @@ class APIMessage {
 
   /**
    * Makes the content of this message.
-   * @returns {?(string|string[])}
+   * @returns {?string}
    */
   makeContent() {
     let content;
@@ -114,33 +113,12 @@ class APIMessage {
       content = Util.verifyString(this.options.content, RangeError, 'MESSAGE_CONTENT_TYPE', false);
     }
 
-    if (typeof content !== 'string') return content;
-
-    const isSplit = typeof this.options.split !== 'undefined' && this.options.split !== false;
-    const isCode = typeof this.options.code !== 'undefined' && this.options.code !== false;
-    const splitOptions = isSplit ? { ...this.options.split } : undefined;
-
-    if (content) {
-      if (isCode) {
-        const codeName = typeof this.options.code === 'string' ? this.options.code : '';
-        content = `\`\`\`${codeName}\n${Util.cleanCodeBlockContent(content)}\n\`\`\``;
-        if (isSplit) {
-          splitOptions.prepend = `${splitOptions.prepend || ''}\`\`\`${codeName}\n`;
-          splitOptions.append = `\n\`\`\`${splitOptions.append || ''}`;
-        }
-      }
-
-      if (isSplit) {
-        content = Util.splitMessage(content, splitOptions);
-      }
-    }
-
     return content;
   }
 
   /**
    * Resolves data.
-   * @returns {APIMessage}
+   * @returns {MessagePayload}
    */
   resolveData() {
     if (this.data) return this;
@@ -159,16 +137,12 @@ class APIMessage {
       }
     }
 
-    const components = this.options.components?.map(c =>
-      BaseMessageComponent.create(
-        Array.isArray(c) ? { type: MessageComponentTypes.ACTION_ROW, components: c } : c,
-      ).toJSON(),
-    );
+    const components = this.options.components?.map(c => BaseMessageComponent.create(c).toJSON());
 
     let username;
     let avatarURL;
     if (isWebhook) {
-      username = this.options.username || this.target.name;
+      username = this.options.username ?? this.target.name;
       if (this.options.avatarURL) avatarURL = this.options.avatarURL;
     }
 
@@ -193,13 +167,12 @@ class APIMessage {
 
     let message_reference;
     if (typeof this.options.reply === 'object') {
-      const message_id = this.isMessage
-        ? this.target.channel.messages.resolveID(this.options.reply.messageReference)
-        : this.target.messages.resolveID(this.options.reply.messageReference);
+      const reference = this.options.reply.messageReference;
+      const message_id = this.isMessage ? reference.id ?? reference : this.target.messages.resolveId(reference);
       if (message_id) {
         message_reference = {
           message_id,
-          fail_if_not_exists: this.options.reply.failIfNotExists ?? true,
+          fail_if_not_exists: this.options.reply.failIfNotExists ?? this.target.client.options.failIfNotExists,
         };
       }
     }
@@ -217,50 +190,20 @@ class APIMessage {
       flags,
       message_reference,
       attachments: this.options.attachments,
+      sticker_ids: this.options.stickers?.map(sticker => sticker.id ?? sticker),
     };
     return this;
   }
 
   /**
    * Resolves files.
-   * @returns {Promise<APIMessage>}
+   * @returns {Promise<MessagePayload>}
    */
   async resolveFiles() {
     if (this.files) return this;
 
     this.files = await Promise.all(this.options.files?.map(file => this.constructor.resolveFile(file)) ?? []);
     return this;
-  }
-
-  /**
-   * Converts this APIMessage into an array of APIMessages for each split content
-   * @returns {APIMessage[]}
-   */
-  split() {
-    if (!this.data) this.resolveData();
-
-    if (!Array.isArray(this.data.content)) return [this];
-
-    const apiMessages = [];
-
-    for (let i = 0; i < this.data.content.length; i++) {
-      let data;
-      let opt;
-
-      if (i === this.data.content.length - 1) {
-        data = { ...this.data, content: this.data.content[i] };
-        opt = { ...this.options, content: this.data.content[i] };
-      } else {
-        data = { content: this.data.content[i], tts: this.data.tts, allowed_mentions: this.options.allowedMentions };
-        opt = { content: this.data.content[i], tts: this.data.tts, allowedMentions: this.options.allowedMentions };
-      }
-
-      const apiMessage = new APIMessage(this.target, opt);
-      apiMessage.data = data;
-      apiMessages.push(apiMessage);
-    }
-
-    return apiMessages;
   }
 
   /**
@@ -291,7 +234,7 @@ class APIMessage {
       name = findName(attachment);
     } else {
       attachment = fileLike.attachment;
-      name = fileLike.name || findName(attachment);
+      name = fileLike.name ?? findName(attachment);
     }
 
     const resource = await DataResolver.resolveFile(attachment);
@@ -299,11 +242,11 @@ class APIMessage {
   }
 
   /**
-   * Creates an `APIMessage` from user-level arguments.
+   * Creates a {@link MessagePayload} from user-level arguments.
    * @param {MessageTarget} target Target to send to
    * @param {string|MessageOptions|WebhookMessageOptions} options Options or content to use
    * @param {MessageOptions|WebhookMessageOptions} [extra={}] - Extra options to add onto specified options
-   * @returns {MessageOptions|WebhookMessageOptions}
+   * @returns {MessagePayload}
    */
   static create(target, options, extra = {}) {
     return new this(
@@ -313,7 +256,7 @@ class APIMessage {
   }
 }
 
-module.exports = APIMessage;
+module.exports = MessagePayload;
 
 /**
  * A target for a message.
@@ -322,6 +265,6 @@ module.exports = APIMessage;
  */
 
 /**
- * @external APIMessageRaw
+ * @external APIMessage
  * @see {@link https://discord.com/developers/docs/resources/channel#message-object}
  */

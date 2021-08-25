@@ -11,7 +11,7 @@ const Util = require('../util/Util');
 class MessageSelectMenu extends BaseMessageComponent {
   /**
    * @typedef {BaseMessageComponentOptions} MessageSelectMenuOptions
-   * @property {string} [customID] A unique string to be sent in the interaction when clicked
+   * @property {string} [customId] A unique string to be sent in the interaction when clicked
    * @property {string} [placeholder] Custom placeholder text to display when nothing is selected
    * @property {number} [minValues] The minimum number of selections required
    * @property {number} [maxValues] The maximum number of selections allowed
@@ -51,7 +51,7 @@ class MessageSelectMenu extends BaseMessageComponent {
      * A unique string to be sent in the interaction when clicked
      * @type {?string}
      */
-    this.customID = data.custom_id ?? data.customID ?? null;
+    this.customId = data.custom_id ?? data.customId ?? null;
 
     /**
      * Custom placeholder text to display when nothing is selected
@@ -79,27 +79,27 @@ class MessageSelectMenu extends BaseMessageComponent {
 
     /**
      * Whether this select menu is currently disabled
-     * @type {?boolean}
+     * @type {boolean}
      */
     this.disabled = data.disabled ?? false;
   }
 
   /**
-   * Sets the custom ID of this select menu
-   * @param {string} customID A unique string to be sent in the interaction when clicked
+   * Sets the custom id of this select menu
+   * @param {string} customId A unique string to be sent in the interaction when clicked
    * @returns {MessageSelectMenu}
    */
-  setCustomID(customID) {
-    this.customID = Util.verifyString(customID, RangeError, 'SELECT_MENU_CUSTOM_ID');
+  setCustomId(customId) {
+    this.customId = Util.verifyString(customId, RangeError, 'SELECT_MENU_CUSTOM_ID');
     return this;
   }
 
   /**
    * Sets the interactive status of the select menu
-   * @param {boolean} disabled Whether this select menu should be disabled
+   * @param {boolean} [disabled=true] Whether this select menu should be disabled
    * @returns {MessageSelectMenu}
    */
-  setDisabled(disabled) {
+  setDisabled(disabled = true) {
     this.disabled = disabled;
     return this;
   }
@@ -146,6 +146,16 @@ class MessageSelectMenu extends BaseMessageComponent {
   }
 
   /**
+   * Sets the options of the select menu.
+   * @param {...MessageSelectOptionData|MessageSelectOptionData[]} options The options to set
+   * @returns {MessageSelectMenu}
+   */
+  setOptions(...options) {
+    this.spliceOptions(0, this.options.length, options);
+    return this;
+  }
+
+  /**
    * Removes, replaces, and inserts options in the select menu.
    * @param {number} index The index to start at
    * @param {number} deleteCount The number of options to remove
@@ -163,7 +173,7 @@ class MessageSelectMenu extends BaseMessageComponent {
    */
   toJSON() {
     return {
-      custom_id: this.customID,
+      custom_id: this.customId,
       disabled: this.disabled,
       placeholder: this.placeholder,
       min_values: this.minValues,

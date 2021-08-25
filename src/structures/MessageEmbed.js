@@ -15,6 +15,13 @@ class MessageEmbed {
    */
 
   /**
+   * A `Partial` object is a representation of any existing object.
+   * This object contains between 0 and all of the original objects parameters.
+   * This is true regardless of whether the parameters are optional in the base object.
+   * @typedef {Object} Partial
+   */
+
+  /**
    * Represents the possible options for a MessageEmbed
    * @typedef {Object} MessageEmbedOptions
    * @property {string} [title] The title of this embed
@@ -37,34 +44,35 @@ class MessageEmbed {
   setup(data, skipValidation) {
     /**
      * The type of this embed, either:
-     * * `rich` - a rich embed
+     * * `rich` - a generic embed rendered from embed attributes
      * * `image` - an image embed
      * * `video` - a video embed
-     * * `gifv` - a gifv embed
+     * * `gifv` - an animated gif image embed rendered as a video embed
      * * `article` - an article embed
      * * `link` - a link embed
      * @type {string}
+     * @see {@link https://discord.com/developers/docs/resources/channel#embed-object-embed-types}
      * @deprecated
      */
-    this.type = data.type || 'rich';
+    this.type = data.type ?? 'rich';
 
     /**
      * The title of this embed
      * @type {?string}
      */
-    this.title = 'title' in data ? data.title : null;
+    this.title = data.title ?? null;
 
     /**
      * The description of this embed
      * @type {?string}
      */
-    this.description = 'description' in data ? data.description : null;
+    this.description = data.description ?? null;
 
     /**
      * The URL of this embed
      * @type {?string}
      */
-    this.url = 'url' in data ? data.url : null;
+    this.url = data.url ?? null;
 
     /**
      * The color of this embed
@@ -111,7 +119,7 @@ class MessageEmbed {
     this.thumbnail = data.thumbnail
       ? {
           url: data.thumbnail.url,
-          proxyURL: data.thumbnail.proxyURL || data.thumbnail.proxy_url,
+          proxyURL: data.thumbnail.proxyURL ?? data.thumbnail.proxy_url,
           height: data.thumbnail.height,
           width: data.thumbnail.width,
         }
@@ -133,7 +141,7 @@ class MessageEmbed {
     this.image = data.image
       ? {
           url: data.image.url,
-          proxyURL: data.image.proxyURL || data.image.proxy_url,
+          proxyURL: data.image.proxyURL ?? data.image.proxy_url,
           height: data.image.height,
           width: data.image.width,
         }
@@ -156,7 +164,7 @@ class MessageEmbed {
     this.video = data.video
       ? {
           url: data.video.url,
-          proxyURL: data.video.proxyURL || data.video.proxy_url,
+          proxyURL: data.video.proxyURL ?? data.video.proxy_url,
           height: data.video.height,
           width: data.video.width,
         }
@@ -179,8 +187,8 @@ class MessageEmbed {
       ? {
           name: data.author.name,
           url: data.author.url,
-          iconURL: data.author.iconURL || data.author.icon_url,
-          proxyIconURL: data.author.proxyIconURL || data.author.proxy_icon_url,
+          iconURL: data.author.iconURL ?? data.author.icon_url,
+          proxyIconURL: data.author.proxyIconURL ?? data.author.proxy_icon_url,
         }
       : null;
 
@@ -217,8 +225,8 @@ class MessageEmbed {
     this.footer = data.footer
       ? {
           text: data.footer.text,
-          iconURL: data.footer.iconURL || data.footer.icon_url,
-          proxyIconURL: data.footer.proxyIconURL || data.footer.proxy_icon_url,
+          iconURL: data.footer.iconURL ?? data.footer.icon_url,
+          proxyIconURL: data.footer.proxyIconURL ?? data.footer.proxy_icon_url,
         }
       : null;
   }
@@ -292,6 +300,16 @@ class MessageEmbed {
   }
 
   /**
+   * Sets the embed's fields (max 25).
+   * @param {...EmbedFieldData|EmbedFieldData[]} fields The fields to set
+   * @returns {MessageEmbed}
+   */
+  setFields(...fields) {
+    this.spliceFields(0, this.fields.length, fields);
+    return this;
+  }
+
+  /**
    * Sets the author of this embed.
    * @param {string} name The name of the author
    * @param {string} [iconURL] The icon URL of the author
@@ -356,7 +374,8 @@ class MessageEmbed {
 
   /**
    * Sets the timestamp of this embed.
-   * @param {Date|number} [timestamp=Date.now()] The timestamp or date
+   * @param {Date|number|null} [timestamp=Date.now()] The timestamp or date.
+   * If `null` then the timestamp will be unset (i.e. when editing an existing {@link MessageEmbed})
    * @returns {MessageEmbed}
    */
   setTimestamp(timestamp = Date.now()) {
@@ -395,29 +414,25 @@ class MessageEmbed {
       type: 'rich',
       description: this.description,
       url: this.url,
-      timestamp: this.timestamp ? new Date(this.timestamp) : null,
+      timestamp: this.timestamp && new Date(this.timestamp),
       color: this.color,
       fields: this.fields,
       thumbnail: this.thumbnail,
       image: this.image,
-      author: this.author
-        ? {
-            name: this.author.name,
-            url: this.author.url,
-            icon_url: this.author.iconURL,
-          }
-        : null,
-      footer: this.footer
-        ? {
-            text: this.footer.text,
-            icon_url: this.footer.iconURL,
-          }
-        : null,
+      author: this.author && {
+        name: this.author.name,
+        url: this.author.url,
+        icon_url: this.author.iconURL,
+      },
+      footer: this.footer && {
+        text: this.footer.text,
+        icon_url: this.footer.iconURL,
+      },
     };
   }
 
   /**
-   * Normalizes field input and resolves strings.
+   * Normalizes field input and verifies strings.
    * @param {string} name The name of the field
    * @param {string} value The value of the field
    * @param {boolean} [inline=false] Set the field to display inline
@@ -447,11 +462,7 @@ class MessageEmbed {
     return fields
       .flat(2)
       .map(field =>
-        this.normalizeField(
-          field && field.name,
-          field && field.value,
-          field && typeof field.inline === 'boolean' ? field.inline : false,
-        ),
+        this.normalizeField(field.name, field.value, typeof field.inline === 'boolean' ? field.inline : false),
       );
   }
 }

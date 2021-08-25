@@ -6,8 +6,6 @@ const { Error } = require('../errors');
 const SnowflakeUtil = require('../util/SnowflakeUtil');
 const UserFlags = require('../util/UserFlags');
 
-let Structures;
-
 /**
  * Represents a user on Discord.
  * @implements {TextBasedChannel}
@@ -22,25 +20,16 @@ class User extends Base {
     super(client);
 
     /**
-     * The ID of the user
+     * The user's id
      * @type {Snowflake}
      */
     this.id = data.id;
 
+    this.bot = null;
+
     this.system = null;
+
     this.flags = null;
-
-    /**
-     * The ID of the last message sent by the user, if one was sent
-     * @type {?Snowflake}
-     */
-    this.lastMessageID = null;
-
-    /**
-     * The ID of the channel for the last message sent by the user, if one was sent
-     * @type {?Snowflake}
-     */
-    this.lastMessageChannelID = null;
 
     this._patch(data);
   }
@@ -56,12 +45,14 @@ class User extends Base {
       this.username = null;
     }
 
-    if ('bot' in data || typeof this.bot !== 'boolean') {
+    if ('bot' in data) {
       /**
        * Whether or not the user is a bot
-       * @type {boolean}
+       * @type {?boolean}
        */
       this.bot = Boolean(data.bot);
+    } else if (!this.partial && typeof this.bot !== 'boolean') {
+      this.bot = false;
     }
 
     if ('discriminator' in data) {
@@ -76,12 +67,34 @@ class User extends Base {
 
     if ('avatar' in data) {
       /**
-       * The ID of the user's avatar
+       * The user avatar's hash
        * @type {?string}
        */
       this.avatar = data.avatar;
     } else if (typeof this.avatar !== 'string') {
       this.avatar = null;
+    }
+
+    if ('banner' in data) {
+      /**
+       * The user banner's hash
+       * <info>The user must be force fetched for this property to be present</info>
+       * @type {?string}
+       */
+      this.banner = data.banner;
+    } else if (typeof this.banner !== 'string') {
+      this.banner = null;
+    }
+
+    if ('accent_color' in data) {
+      /**
+       * The base 10 accent color of the user's banner
+       * <info>The user must be force fetched for this property to be present</info>
+       * @type {?number}
+       */
+      this.accentColor = data.accent_color;
+    } else if (typeof this.accentColor === 'undefined') {
+      this.accentColor = null;
     }
 
     if ('system' in data) {
@@ -90,6 +103,8 @@ class User extends Base {
        * @type {?boolean}
        */
       this.system = Boolean(data.system);
+    } else if (!this.partial && typeof this.system !== 'boolean') {
+      this.system = false;
     }
 
     if ('public_flags' in data) {
@@ -129,30 +144,6 @@ class User extends Base {
   }
 
   /**
-   * The Message object of the last message sent by the user, if one was sent
-   * @type {?Message}
-   * @readonly
-   */
-  get lastMessage() {
-    const channel = this.client.channels.cache.get(this.lastMessageChannelID);
-    return (channel && channel.messages.cache.get(this.lastMessageID)) || null;
-  }
-
-  /**
-   * The presence of this user
-   * @type {Presence}
-   * @readonly
-   */
-  get presence() {
-    for (const guild of this.client.guilds.cache.values()) {
-      if (guild.presences.cache.has(this.id)) return guild.presences.cache.get(this.id);
-    }
-    if (!Structures) Structures = require('../util/Structures');
-    const Presence = Structures.get('Presence');
-    return new Presence(this.client, { user: { id: this.id } });
-  }
-
-  /**
    * A link to the user's avatar.
    * @param {ImageURLOptions} [options={}] Options for the Image URL
    * @returns {?string}
@@ -178,7 +169,29 @@ class User extends Base {
    * @returns {string}
    */
   displayAvatarURL(options) {
-    return this.avatarURL(options) || this.defaultAvatarURL;
+    return this.avatarURL(options) ?? this.defaultAvatarURL;
+  }
+
+  /**
+   * The hexadecimal version of the user accent color, with a leading hash
+   * <info>The user must be force fetched for this property to be present</info>
+   * @type {?string}
+   * @readonly
+   */
+  get hexAccentColor() {
+    if (!this.accentColor) return null;
+    return `#${this.accentColor.toString(16).padStart(6, '0')}`;
+  }
+
+  /**
+   * A link to the user's banner.
+   * <info>The user must be force fetched for this property to be present</info>
+   * @param {ImageURLOptions} [options={}] Options for the Image URL
+   * @returns {?string}
+   */
+  bannerURL({ format, size, dynamic } = {}) {
+    if (!this.banner) return null;
+    return this.client.rest.cdn.Banner(this.id, this.banner, format, size, dynamic);
   }
 
   /**
@@ -191,42 +204,12 @@ class User extends Base {
   }
 
   /**
-   * Checks whether the user is typing in a channel.
-   * @param {ChannelResolvable} channel The channel to check in
-   * @returns {boolean}
-   */
-  typingIn(channel) {
-    channel = this.client.channels.resolve(channel);
-    return channel._typing.has(this.id);
-  }
-
-  /**
-   * Gets the time that the user started typing.
-   * @param {ChannelResolvable} channel The channel to get the time in
-   * @returns {?Date}
-   */
-  typingSinceIn(channel) {
-    channel = this.client.channels.resolve(channel);
-    return channel._typing.has(this.id) ? new Date(channel._typing.get(this.id).since) : null;
-  }
-
-  /**
-   * Gets the amount of time the user has been typing in a channel for (in milliseconds), or -1 if they're not typing.
-   * @param {ChannelResolvable} channel The channel to get the time in
-   * @returns {number}
-   */
-  typingDurationIn(channel) {
-    channel = this.client.channels.resolve(channel);
-    return channel._typing.has(this.id) ? channel._typing.get(this.id).elapsedTime : -1;
-  }
-
-  /**
    * The DM between the client's user and this user
    * @type {?DMChannel}
    * @readonly
    */
   get dmChannel() {
-    return this.client.channels.cache.find(c => c.type === 'dm' && c.recipient.id === this.id) || null;
+    return this.client.channels.cache.find(c => c.type === 'DM' && c.recipient.id === this.id) ?? null;
   }
 
   /**
@@ -245,7 +228,7 @@ class User extends Base {
         recipient_id: this.id,
       },
     });
-    return this.client.channels.add(data);
+    return this.client.channels._add(data);
   }
 
   /**
@@ -256,12 +239,13 @@ class User extends Base {
     const { dmChannel } = this;
     if (!dmChannel) throw new Error('USER_NO_DMCHANNEL');
     await this.client.api.channels(dmChannel.id).delete();
-    this.client.channels.remove(dmChannel.id);
+    this.client.channels._remove(dmChannel.id);
     return dmChannel;
   }
 
   /**
-   * Checks if the user is equal to another. It compares ID, username, discriminator, avatar, and bot flags.
+   * Checks if the user is equal to another.
+   * It compares id, username, discriminator, avatar, banner, accent color, and bot flags.
    * It is recommended to compare equality by using `user.id === user2.id` unless you want to compare all properties.
    * @param {User} user User to compare with
    * @returns {boolean}
@@ -272,7 +256,9 @@ class User extends Base {
       this.id === user.id &&
       this.username === user.username &&
       this.discriminator === user.discriminator &&
-      this.avatar === user.avatar;
+      this.avatar === user.avatar &&
+      this.banner === user.banner &&
+      this.accentColor === user.accentColor;
 
     return equal;
   }
@@ -291,11 +277,11 @@ class User extends Base {
 
   /**
    * Fetches this user.
-   * @param {boolean} [force=false] Whether to skip the cache check and request the API
+   * @param {boolean} [force=true] Whether to skip the cache check and request the API
    * @returns {Promise<User>}
    */
-  fetch(force = false) {
-    return this.client.users.fetch(this.id, true, force);
+  fetch(force = true) {
+    return this.client.users.fetch(this.id, { force });
   }
 
   /**
@@ -314,14 +300,14 @@ class User extends Base {
       {
         createdTimestamp: true,
         defaultAvatarURL: true,
+        hexAccentColor: true,
         tag: true,
-        lastMessage: false,
-        lastMessageID: false,
       },
       ...props,
     );
     json.avatarURL = this.avatarURL();
     json.displayAvatarURL = this.displayAvatarURL();
+    json.bannerURL = this.bannerURL();
     return json;
   }
 

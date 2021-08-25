@@ -16,15 +16,15 @@ class MessageComponentInteraction extends Interaction {
 
     /**
      * The message to which the component was attached
-     * @type {?(Message|APIMessageRaw)}
+     * @type {Message|APIMessage}
      */
-    this.message = data.message ? this.channel?.messages.add(data.message) ?? data.message : null;
+    this.message = this.channel?.messages._add(data.message) ?? data.message;
 
     /**
-     * The custom ID of the component which was interacted with
+     * The custom id of the component which was interacted with
      * @type {string}
      */
-    this.customID = data.data.custom_id;
+    this.customId = data.data.custom_id;
 
     /**
      * The type of component which was interacted with
@@ -54,7 +54,27 @@ class MessageComponentInteraction extends Interaction {
      * An associated interaction webhook, can be used to further interact with this interaction
      * @type {InteractionWebhook}
      */
-    this.webhook = new InteractionWebhook(this.client, this.applicationID, this.token);
+    this.webhook = new InteractionWebhook(this.client, this.applicationId, this.token);
+  }
+
+  /**
+   * Raw message components from the API
+   * * APIMessageButton
+   * * APIMessageSelectMenu
+   * @typedef {APIMessageButton|APIMessageSelectMenu} APIMessageActionRowComponent
+   */
+
+  /**
+   * The component which was interacted with
+   * @type {?(MessageActionRowComponent|APIMessageActionRowComponent)}
+   * @readonly
+   */
+  get component() {
+    return (
+      this.message.components
+        .flatMap(row => row.components)
+        .find(component => (component.customId ?? component.custom_id) === this.customId) ?? null
+    );
   }
 
   /**
@@ -69,7 +89,7 @@ class MessageComponentInteraction extends Interaction {
 
   // These are here only for documentation purposes - they are implemented by InteractionResponses
   /* eslint-disable no-empty-function */
-  defer() {}
+  deferReply() {}
   reply() {}
   fetchReply() {}
   editReply() {}
@@ -82,3 +102,13 @@ class MessageComponentInteraction extends Interaction {
 InteractionResponses.applyToClass(MessageComponentInteraction);
 
 module.exports = MessageComponentInteraction;
+
+/**
+ * @external APIMessageSelectMenu
+ * @see {@link https://discord.com/developers/docs/interactions/message-components#select-menu-object}
+ */
+
+/**
+ * @external APIMessageButton
+ * @see {@link https://discord.com/developers/docs/interactions/message-components#button-object}
+ */
