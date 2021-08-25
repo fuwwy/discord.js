@@ -58,6 +58,8 @@ class ClientPresence extends Presence {
         data.activities.push({
           type: typeof activity.type === 'number' ? activity.type : ActivityTypes[activity.type],
           name: activity.name,
+          state: activity.state,
+          emoji: activity.emoji,
           url: activity.url,
         });
       }
@@ -67,6 +69,8 @@ class ClientPresence extends Presence {
           name: a.name,
           type: ActivityTypes[a.type],
           url: a.url ?? undefined,
+          state: a.state ?? undefined,
+          emoji: a.emoji ?? undefined,
         })),
       );
     }
