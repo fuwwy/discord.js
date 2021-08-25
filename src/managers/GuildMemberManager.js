@@ -205,7 +205,7 @@ class GuildMemberManager extends CachedManager {
    */
   subscribe(channels, options = {}) {
     this.guild.shard.send({
-      op: OPCodes.LAZY_GUILD_SUBSCRIBE,
+      op: Opcodes.LAZY_GUILD_SUBSCRIBE,
       d: {
         guild_id: this.guild.id,
         channels,
